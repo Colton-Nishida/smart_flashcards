@@ -20,10 +20,13 @@ logger = logging.getLogger(__name__)
 MAX_PDF_BYTES = 20 * 1024 * 1024  # practical cap, well under the 32 MB API limit
 _PDF_MAGIC = b"%PDF-"
 _SKILL_PATH = Path(__file__).resolve().parent.parent / "skills" / "flashcard_generation.md"
-# Output-token budget for one generation call. Kept under the SDK's non-streaming
-# timeout guard (which rejects very large max_tokens on a blocking request). The model
-# supports up to 128k, but going that high requires switching to a streaming call.
+# Output-token budget for one generation call. Above ~21k the SDK refuses a non-streaming
+# request unless an explicit per-request timeout is given (its default guard estimates the
+# response could exceed 10 min). We pass _REQUEST_TIMEOUT_SECONDS below to opt in. Going to
+# the model's 128k ceiling would instead require switching to a streaming call.
 _MAX_OUTPUT_TOKENS = 32000
+# Explicit per-request timeout — also disables the SDK's non-streaming max_tokens guard.
+_REQUEST_TIMEOUT_SECONDS = 300.0
 
 
 def _is_truncated_json(exc: ValidationError) -> bool:
@@ -62,6 +65,7 @@ def generate_flashcards(
         response = client.messages.parse(
             model=model,
             max_tokens=_MAX_OUTPUT_TOKENS,
+            timeout=_REQUEST_TIMEOUT_SECONDS,
             system=load_skill_prompt(),
             messages=[
                 {

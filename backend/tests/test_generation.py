@@ -103,6 +103,9 @@ class TestGenerateFlashcards:
         kwargs = client.messages.parse.call_args.kwargs
         assert kwargs["model"] == "claude-haiku-4-5"
         assert kwargs["max_tokens"] == 32000
+        # explicit timeout is required: without it the SDK refuses a non-streaming
+        # request at this max_tokens (its 10-min guard). Regression guard.
+        assert kwargs["timeout"] == 300.0
         assert kwargs["output_format"] is FlashcardDeck
         assert "Atomic" in kwargs["system"]  # skill prompt loaded into system
 
