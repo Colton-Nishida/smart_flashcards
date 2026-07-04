@@ -88,7 +88,7 @@ class TestGenerateFlashcards:
         )
         kwargs = client.messages.parse.call_args.kwargs
         assert kwargs["model"] == "claude-haiku-4-5"
-        assert kwargs["max_tokens"] == 16000
+        assert kwargs["max_tokens"] == 32000
         assert kwargs["output_format"] is FlashcardDeck
         assert "Atomic" in kwargs["system"]  # skill prompt loaded into system
 
