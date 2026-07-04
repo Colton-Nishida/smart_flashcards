@@ -63,6 +63,36 @@ class TestListDecks:
         assert summary["card_count"] == 2
         assert "cards" not in summary
 
+    def test_list_is_ordered_newest_first(self, client, app, logged_in_user):
+        """Decks must come back newest-first, not in random deck-id order.
+
+        Regression: list_decks sorted by filename (the random hex deck id), so the
+        order was arbitrary and unstable relative to creation time.
+        """
+        storage = app.state.storage
+        user_id = logged_in_user["id"]
+        # Craft decks whose ids sort in the OPPOSITE order of their created_at, so a
+        # filename sort would disagree with a chronological one.
+        specs = [
+            ("d_aaa", "oldest", "2026-01-01T00:00:00Z"),
+            ("d_ccc", "middle", "2026-06-01T00:00:00Z"),
+            ("d_bbb", "newest", "2026-12-01T00:00:00Z"),
+        ]
+        for deck_id, name, created_at in specs:
+            storage.write_deck(
+                user_id,
+                {
+                    "id": deck_id,
+                    "name": name,
+                    "description": "",
+                    "created_at": created_at,
+                    "source_filename": "x.pdf",
+                    "cards": [],
+                },
+            )
+        names = [d["name"] for d in client.get("/api/decks").json()]
+        assert names == ["newest", "middle", "oldest"]
+
 
 class TestGetDeck:
     def test_get_full_deck(self, client, deck):

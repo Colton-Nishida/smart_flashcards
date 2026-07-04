@@ -67,6 +67,9 @@ def list_deck_summaries(storage: Storage, user_id: str) -> list[dict[str, Any]]:
         summary["source_filename"] = deck["source_filename"]
         summary["card_count"] = len(deck["cards"])
         summaries.append(summary)
+    # storage.list_decks orders by filename (the random hex deck id), which is
+    # arbitrary relative to creation time. Present decks newest-first instead.
+    summaries.sort(key=lambda s: s["created_at"], reverse=True)
     return summaries
 
 
