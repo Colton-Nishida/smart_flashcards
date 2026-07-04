@@ -16,7 +16,8 @@ function validateFile(file: File): string | null {
 
 function friendlyError(err: unknown): string {
   if (err instanceof ApiError) {
-    if (err.status === 413) return 'That document is too large to generate cards from — try a smaller PDF (under 20 MB).'
+    // 413 covers both an oversized file and too-many-cards-to-fit; the backend's
+    // `detail` explains which, so surface it rather than guessing here.
     if (err.status === 0) return 'Could not reach the server — check that the backend is running, then try again.'
   }
   return errorMessage(err)

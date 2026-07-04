@@ -5,8 +5,15 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+from pydantic import ValidationError
 
-from app.generation.errors import DocumentTooLargeError, InvalidPdfError, PdfTooLargeError
+from app.generation.errors import (
+    DocumentTooLargeError,
+    GenerationError,
+    InvalidPdfError,
+    MalformedGenerationError,
+    PdfTooLargeError,
+)
 from app.generation.models import Flashcard, FlashcardDeck
 from app.generation.service import (
     MAX_PDF_BYTES,
@@ -120,3 +127,47 @@ class TestGenerateFlashcards:
                 description="",
                 model="claude-sonnet-5",
             )
+
+    def test_truncated_json_raises_document_too_large(self):
+        """A large PDF can overflow the output cap, leaving parse() with incomplete JSON.
+
+        messages.parse() raises a JSON-decode ValidationError BEFORE we can inspect
+        stop_reason, so this path must be caught and mapped to 'document too large'.
+        """
+        try:
+            FlashcardDeck.model_validate_json('{"cards": [{"front": "What is')
+        except ValidationError as truncated:  # a real json_invalid error
+            err = truncated
+        client = MagicMock()
+        client.messages.parse.side_effect = err
+
+        with pytest.raises(DocumentTooLargeError):
+            generate_flashcards(
+                client,
+                pdf_bytes=PDF_BYTES,
+                deck_name="Huge",
+                description="",
+                model="claude-sonnet-5",
+            )
+
+    def test_schema_mismatch_raises_malformed_generation(self):
+        """A validation error that is NOT truncation maps to a malformed-output error (502)."""
+        try:
+            FlashcardDeck.model_validate({"cards": "not-a-list"})
+        except ValidationError as bad_schema:
+            err = bad_schema
+        client = MagicMock()
+        client.messages.parse.side_effect = err
+
+        with pytest.raises(MalformedGenerationError):
+            generate_flashcards(
+                client,
+                pdf_bytes=PDF_BYTES,
+                deck_name="Weird",
+                description="",
+                model="claude-sonnet-5",
+            )
+
+    def test_error_types_are_generation_errors(self):
+        assert issubclass(DocumentTooLargeError, GenerationError)
+        assert issubclass(MalformedGenerationError, GenerationError)
