@@ -153,6 +153,26 @@ class TestGenerateFlashcards:
                 model="claude-sonnet-5",
             )
 
+    def test_no_parsed_output_raises_malformed_generation(self):
+        """A response with no parsable output (e.g. a model refusal) leaves parsed_output=None.
+
+        stop_reason is NOT max_tokens, so the code must not blindly dereference
+        parsed_output (that used to raise AttributeError -> raw 500). It maps to a
+        malformed-generation error (502).
+        """
+        client = MagicMock()
+        client.messages.parse.return_value = SimpleNamespace(
+            stop_reason="refusal", parsed_output=None
+        )
+        with pytest.raises(MalformedGenerationError):
+            generate_flashcards(
+                client,
+                pdf_bytes=PDF_BYTES,
+                deck_name="Refused",
+                description="",
+                model="claude-sonnet-5",
+            )
+
     def test_schema_mismatch_raises_malformed_generation(self):
         """A validation error that is NOT truncation maps to a malformed-output error (502)."""
         try:

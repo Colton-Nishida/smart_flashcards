@@ -116,5 +116,15 @@ def generate_flashcards(
             "The document produced more cards than fit in one response; it is too large."
         )
     deck = response.parsed_output
+    if deck is None:
+        # No parsable output — e.g. the model refused (stop_reason="refusal") or returned
+        # a response with no text block. Dereferencing it would raise a raw 500.
+        logger.warning(
+            "Generation returned no parsed output: deck=%r stop_reason=%r pdf_bytes=%d",
+            deck_name,
+            response.stop_reason,
+            len(pdf_bytes),
+        )
+        raise MalformedGenerationError("Model returned no flashcard data")
     logger.info("Generated %d cards: deck=%r", len(deck.cards), deck_name)
     return deck

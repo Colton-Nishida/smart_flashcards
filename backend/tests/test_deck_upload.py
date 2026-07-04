@@ -98,6 +98,16 @@ class TestCreateDeck:
         assert resp.status_code == 413
         assert "too large" in resp.json()["detail"].lower()
 
+    def test_refusal_empty_output_maps_to_502_not_500(self, client, mock_anthropic, logged_in_user):
+        """A model refusal (or any response with no parsed output) has stop_reason
+        != max_tokens and parsed_output=None. It must map to a clean 502, not a raw 500."""
+        mock_anthropic.messages.parse.return_value = SimpleNamespace(
+            stop_reason="refusal", parsed_output=None
+        )
+        resp = upload(client)
+        assert resp.status_code == 502
+        assert client.get("/api/decks").json() == []
+
     def test_missing_name_422(self, client, mock_anthropic, logged_in_user):
         resp = client.post(
             "/api/decks",
