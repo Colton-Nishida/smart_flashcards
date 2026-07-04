@@ -184,8 +184,8 @@ class FlashcardDeck(BaseModel):
     cards: list[Flashcard]
 
 response = client.messages.parse(
-    model=settings.anthropic_model,           # claude-sonnet-4-5
-    max_tokens=16000,
+    model=settings.anthropic_model,           # claude-sonnet-5
+    max_tokens=32000,   # non-streaming budget; 128k is possible but needs streaming
     system=load_skill("flashcard_generation.md"),   # the versioned skill prompt
     messages=[{
         "role": "user",
