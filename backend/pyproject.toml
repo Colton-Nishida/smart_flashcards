@@ -9,7 +9,7 @@ packages = [{ include = "app" }]
 python = "^3.12"
 fastapi = "^0.115"
 uvicorn = { extras = ["standard"], version = "^0.34" }
-anthropic = "^0.60"
+anthropic = "^0.116.0"
 pydantic = "^2.10"
 pydantic-settings = "^2.7"
 python-multipart = "^0.0.20"

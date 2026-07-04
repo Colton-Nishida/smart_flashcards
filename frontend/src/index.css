@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Avenir Next", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, ui-serif, serif;
+
+  /* Paper-and-ink palette: warm neutrals with a rust accent. */
+  --color-paper: #f6f3ec;
+  --color-card: #fffdf7;
+  --color-ink: #241f18;
+  --color-accent: #a03d1e;
+  --color-accent-deep: #7f2f16;
+}
+
+body {
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
