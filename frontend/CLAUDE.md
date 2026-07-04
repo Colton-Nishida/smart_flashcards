@@ -20,16 +20,26 @@ working rules.
 
 | Path | Purpose |
 |---|---|
-| `src/App.tsx` | Auth gate + tab shell (react-router) |
-| `src/api/` | Typed fetch client — the ONLY place that calls the backend; mirror backend Pydantic schemas as TS types here |
-| `src/pages/Upload.tsx` | Upload flow |
-| `src/pages/Decks.tsx` | Deck list / deck view / study mode |
-| `src/components/` | CardViewer, DeckList, etc. |
+| `src/App.tsx` | Auth gate + tab shell (react-router); routes: `/upload`, `/decks`, `/decks/:deckId` |
+| `src/api/` | Typed fetch client — the ONLY place that calls the backend; `types.ts` mirrors backend Pydantic schemas, `client.ts` has one function per endpoint |
+| `src/pages/Login.tsx` | Login screen with register/login toggle |
+| `src/pages/Upload.tsx` | Upload flow (validation, sync-generation progress state) |
+| `src/pages/Decks.tsx` | Deck list |
+| `src/pages/DeckView.tsx` | Deck view: metadata/card editing + study-mode entry |
+| `src/components/` | `StudyMode`, `CardRow` (inline edit/delete), `AddCardForm` |
+| `src/lib/format.ts` | Small shared helpers (date formatting) |
+| `src/index.css` | Tailwind v4 entry: `@import "tailwindcss"` + `@theme` design tokens |
 
 ## Conventions
 
 - `fetch` with `credentials: "include"` (session cookie auth); handle 401 by routing to login.
+  Implementation: `src/api/client.ts` dispatches `UNAUTHORIZED_EVENT` on `window` for any 401;
+  `App.tsx` listens and clears the user, which renders the login screen.
+- All API failures throw `ApiError` (status + FastAPI `detail`); use `isUnauthorized()` /
+  `errorMessage()` from `src/api` in pages.
 - Keep state local/component-level; no Redux/Zustand at this size.
+- Tailwind v4: no `tailwind.config.*` — the `@tailwindcss/vite` plugin + `@theme` tokens in
+  `src/index.css` (`paper`, `card`, `ink`, `accent`, `accent-deep` colors; `font-display` serif).
 - Verify UI changes end-to-end with the Playwright MCP against the running dev servers.
 
 ## Commands (run from this directory)
