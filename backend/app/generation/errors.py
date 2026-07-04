@@ -14,4 +14,13 @@ class PdfTooLargeError(GenerationError):
 
 
 class DocumentTooLargeError(GenerationError):
-    """The model hit max_tokens before finishing the deck. -> HTTP 413"""
+    """The model hit max_tokens before finishing the deck. -> HTTP 413
+
+    Includes the case where the response JSON is truncated mid-object because output
+    overflowed the token cap — messages.parse() then raises a JSON-decode ValidationError.
+    """
+
+
+class MalformedGenerationError(GenerationError):
+    """The model returned output that isn't valid FlashcardDeck data (not truncation).
+    -> HTTP 502"""

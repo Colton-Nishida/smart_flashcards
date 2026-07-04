@@ -83,6 +83,21 @@ class TestCreateDeck:
         assert resp.status_code == 413
         assert "too large" in resp.json()["detail"].lower()
 
+    def test_truncated_json_maps_to_413_not_500(self, client, mock_anthropic, logged_in_user):
+        """Regression: a large PDF that overflows the output cap truncates the JSON,
+        which used to surface as a raw 500 instead of a friendly 413."""
+        from pydantic import ValidationError
+
+        from app.generation.models import FlashcardDeck
+
+        try:
+            FlashcardDeck.model_validate_json('{"cards": [{"front": "What is')
+        except ValidationError as truncated:
+            mock_anthropic.messages.parse.side_effect = truncated
+        resp = upload(client)
+        assert resp.status_code == 413
+        assert "too large" in resp.json()["detail"].lower()
+
     def test_missing_name_422(self, client, mock_anthropic, logged_in_user):
         resp = client.post(
             "/api/decks",
