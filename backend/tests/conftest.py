@@ -28,7 +28,9 @@ def client(app) -> TestClient:
     return TestClient(app)
 
 
-def register_and_login(client: TestClient, username: str = "cole", password: str = "hunter2secure") -> dict:
+def register_and_login(
+    client: TestClient, username: str = "cole", password: str = "hunter2secure"
+) -> dict:
     """Register a user and log in; returns the user payload. Cookie sticks to the client."""
     resp = client.post("/api/auth/register", json={"username": username, "password": password})
     assert resp.status_code == 201, resp.text

@@ -118,9 +118,7 @@ class TestCards:
         assert len(deck_body["cards"]) == 3
 
     def test_add_card_default_tags(self, client, deck):
-        resp = client.post(
-            f"/api/decks/{deck['id']}/cards", json={"front": "Q", "back": "A"}
-        )
+        resp = client.post(f"/api/decks/{deck['id']}/cards", json={"front": "Q", "back": "A"})
         assert resp.status_code == 201
         assert resp.json()["tags"] == []
 

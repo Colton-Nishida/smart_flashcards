@@ -1,0 +1,118 @@
+"""Tests for POST /api/decks — multipart upload -> synchronous generation -> persisted deck."""
+
+from types import SimpleNamespace
+from unittest.mock import MagicMock
+
+import anthropic
+import httpx
+import pytest
+
+from app.generation.deps import get_anthropic_client
+from app.generation.models import Flashcard, FlashcardDeck
+from app.generation.service import MAX_PDF_BYTES
+from tests.conftest import register_and_login
+
+PDF_BYTES = b"%PDF-1.4 fake pdf content for testing"
+
+GENERATED = FlashcardDeck(
+    cards=[
+        Flashcard(front="What is glycolysis?", back="Breakdown of glucose.", tags=["metabolism"]),
+        Flashcard(front="What is ATP?", back="Energy currency.", tags=[]),
+    ]
+)
+
+
+@pytest.fixture
+def mock_anthropic(app) -> MagicMock:
+    client = MagicMock()
+    client.messages.parse.return_value = SimpleNamespace(
+        stop_reason="end_turn", parsed_output=GENERATED
+    )
+    app.dependency_overrides[get_anthropic_client] = lambda: client
+    return client
+
+
+def upload(client, *, data: bytes = PDF_BYTES, name: str = "Bio 101", filename: str = "ch4.pdf"):
+    return client.post(
+        "/api/decks",
+        files={"file": (filename, data, "application/pdf")},
+        data={"name": name, "description": "Cell respiration"},
+    )
+
+
+class TestCreateDeck:
+    def test_unauthenticated_401(self, client, mock_anthropic):
+        assert upload(client).status_code == 401
+
+    def test_creates_and_persists_deck(self, client, mock_anthropic, logged_in_user):
+        resp = upload(client)
+        assert resp.status_code == 201, resp.text
+        deck = resp.json()
+        assert deck["name"] == "Bio 101"
+        assert deck["description"] == "Cell respiration"
+        assert deck["source_filename"] == "ch4.pdf"
+        assert [c["front"] for c in deck["cards"]] == ["What is glycolysis?", "What is ATP?"]
+        assert all(c["id"].startswith("c_") for c in deck["cards"])
+
+        # persisted: retrievable and listed
+        assert client.get(f"/api/decks/{deck['id']}").status_code == 200
+        [summary] = client.get("/api/decks").json()
+        assert summary["card_count"] == 2
+
+    def test_generation_uses_configured_model(self, client, mock_anthropic, logged_in_user):
+        upload(client)
+        assert mock_anthropic.messages.parse.call_args.kwargs["model"] == "claude-sonnet-5"
+
+    def test_non_pdf_rejected_400(self, client, mock_anthropic, logged_in_user):
+        resp = upload(client, data=b"just some text", filename="notes.txt")
+        assert resp.status_code == 400
+        mock_anthropic.messages.parse.assert_not_called()
+
+    def test_oversized_pdf_rejected_413(self, client, mock_anthropic, logged_in_user):
+        resp = upload(client, data=b"%PDF-" + b"0" * MAX_PDF_BYTES)
+        assert resp.status_code == 413
+        mock_anthropic.messages.parse.assert_not_called()
+
+    def test_max_tokens_maps_to_413_document_too_large(
+        self, client, mock_anthropic, logged_in_user
+    ):
+        mock_anthropic.messages.parse.return_value = SimpleNamespace(
+            stop_reason="max_tokens", parsed_output=None
+        )
+        resp = upload(client)
+        assert resp.status_code == 413
+        assert "too large" in resp.json()["detail"].lower()
+
+    def test_missing_name_422(self, client, mock_anthropic, logged_in_user):
+        resp = client.post(
+            "/api/decks",
+            files={"file": ("ch4.pdf", PDF_BYTES, "application/pdf")},
+            data={"description": "no name"},
+        )
+        assert resp.status_code == 422
+
+    def test_anthropic_api_error_maps_to_502(self, client, mock_anthropic, logged_in_user):
+        mock_anthropic.messages.parse.side_effect = anthropic.APIConnectionError(
+            request=httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+        )
+        resp = upload(client)
+        assert resp.status_code == 502
+
+    def test_failed_generation_persists_nothing(self, client, mock_anthropic, logged_in_user):
+        mock_anthropic.messages.parse.return_value = SimpleNamespace(
+            stop_reason="max_tokens", parsed_output=None
+        )
+        upload(client)
+        assert client.get("/api/decks").json() == []
+
+
+class TestIsolationOnCreate:
+    def test_created_deck_belongs_to_creator_only(self, client, app, mock_anthropic):
+        from fastapi.testclient import TestClient
+
+        register_and_login(client, username="alice")
+        deck_id = upload(client).json()["id"]
+
+        other = TestClient(app)
+        register_and_login(other, username="bob")
+        assert other.get(f"/api/decks/{deck_id}").status_code == 404

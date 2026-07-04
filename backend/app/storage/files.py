@@ -1,5 +1,6 @@
 """JSON-file backed storage with atomic write-then-rename."""
 
+import contextlib
 import json
 import os
 import re
@@ -30,10 +31,8 @@ def _atomic_write_json(path: Path, data: dict[str, Any]) -> None:
             os.fsync(f.fileno())
         os.replace(tmp_name, path)
     except BaseException:
-        try:
+        with contextlib.suppress(FileNotFoundError):
             os.unlink(tmp_name)
-        except FileNotFoundError:
-            pass
         raise
 
 

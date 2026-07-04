@@ -2,12 +2,17 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import anthropic
+from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, status
 
 from app.auth.deps import CurrentUser
+from app.config import Settings
 from app.decks import service
 from app.decks.models import Card, CardCreate, CardUpdate, Deck, DeckSummary, DeckUpdate
-from app.deps import get_storage
+from app.deps import get_settings, get_storage
+from app.generation import service as generation
+from app.generation.deps import AnthropicClient
+from app.generation.errors import DocumentTooLargeError, InvalidPdfError, PdfTooLargeError
 from app.storage import Storage, StorageIdError
 
 router = APIRouter(prefix="/api/decks", tags=["decks"])
@@ -20,6 +25,55 @@ StorageDep = Annotated[Storage, Depends(get_storage)]
 def _404(exc: Exception) -> HTTPException:
     kind = "Card" if isinstance(exc, service.CardNotFoundError) else "Deck"
     return HTTPException(status.HTTP_404_NOT_FOUND, detail=f"{kind} not found")
+
+
+@router.post("", response_model=Deck, status_code=status.HTTP_201_CREATED)
+def create_deck(
+    user: CurrentUser,
+    storage: StorageDep,
+    settings: Annotated[Settings, Depends(get_settings)],
+    client: AnthropicClient,
+    file: UploadFile,
+    name: Annotated[str, Form(min_length=1, max_length=200)],
+    description: Annotated[str, Form(max_length=2000)] = "",
+) -> Deck:
+    """Upload a PDF, generate cards synchronously, persist and return the deck."""
+    pdf_bytes = file.file.read()
+    try:
+        generation.validate_pdf(pdf_bytes)
+    except InvalidPdfError:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, detail="Upload must be a PDF file"
+        ) from None
+    except PdfTooLargeError as exc:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=str(exc)) from None
+
+    try:
+        generated = generation.generate_flashcards(
+            client,
+            pdf_bytes=pdf_bytes,
+            deck_name=name,
+            description=description,
+            model=settings.anthropic_model,
+        )
+    except DocumentTooLargeError:
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Document too large"
+        ) from None
+    except anthropic.APIError:
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY, detail="Flashcard generation failed; please retry"
+        ) from None
+
+    deck = service.create_deck(
+        storage,
+        user["id"],
+        name=name,
+        description=description,
+        source_filename=file.filename or "upload.pdf",
+        cards=[card.model_dump() for card in generated.cards],
+    )
+    return Deck(**deck)
 
 
 @router.get("", response_model=list[DeckSummary])

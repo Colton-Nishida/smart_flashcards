@@ -99,9 +99,7 @@ class TestLogout:
 
 class TestFullFlow:
     def test_register_login_me_logout_flow(self, client):
-        reg = client.post(
-            "/api/auth/register", json={"username": "ana", "password": "sup3rsecret"}
-        )
+        reg = client.post("/api/auth/register", json={"username": "ana", "password": "sup3rsecret"})
         assert reg.status_code == 201
         login = client.post("/api/auth/login", json={"username": "ana", "password": "sup3rsecret"})
         assert login.status_code == 200
