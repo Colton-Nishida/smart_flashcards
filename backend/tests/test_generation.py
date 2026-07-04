@@ -52,6 +52,13 @@ class TestSkillPrompt:
         assert "flashcard" in prompt.lower()
         assert "Atomic" in prompt  # anchored to the checked-in skill file
 
+    def test_skill_forbids_outside_information(self):
+        """The skill must keep generation strictly source-only (regression guard)."""
+        prompt = load_skill_prompt().lower()
+        assert "only source" in prompt
+        assert "internet" in prompt
+        assert "prior knowledge" in prompt
+
 
 def _mock_client(stop_reason="end_turn", cards=None):
     if cards is None:
