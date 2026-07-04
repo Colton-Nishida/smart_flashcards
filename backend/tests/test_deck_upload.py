@@ -106,6 +106,28 @@ class TestCreateDeck:
         assert client.get("/api/decks").json() == []
 
 
+class TestUnconfiguredApiKey:
+    def test_upload_without_api_key_returns_503(self, tmp_path):
+        """No ANTHROPIC_API_KEY configured -> friendly 503, not a raw 500 TypeError."""
+        from fastapi.testclient import TestClient
+
+        from app.config import Settings
+        from app.main import create_app
+
+        settings = Settings(
+            _env_file=None,
+            anthropic_api_key="",
+            session_secret="test-session-secret",
+            data_dir=tmp_path / "data",
+        )
+        client = TestClient(create_app(settings))
+        register_and_login(client)
+
+        resp = upload(client)
+        assert resp.status_code == 503
+        assert "ANTHROPIC_API_KEY" in resp.json()["detail"]
+
+
 class TestIsolationOnCreate:
     def test_created_deck_belongs_to_creator_only(self, client, app, mock_anthropic):
         from fastapi.testclient import TestClient

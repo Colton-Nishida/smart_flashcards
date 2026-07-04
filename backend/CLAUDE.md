@@ -34,7 +34,8 @@ API surface and data model; root `CLAUDE.md` for working rules (worktrees, TDD, 
   (`tests/test_live_api.py`).
 - Upload validation: PDF magic-byte check (`%PDF-`) → 400, ≤20 MB → 413. Map
   `stop_reason == "max_tokens"` to HTTP 413 "Document too large"; other Anthropic API errors
-  → 502.
+  → 502. Missing/empty `ANTHROPIC_API_KEY` → 503 from `get_anthropic_client` (the SDK would
+  otherwise raise a bare `TypeError` → raw 500).
 
 ## Commands (run from this directory)
 
