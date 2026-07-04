@@ -32,10 +32,19 @@ API surface and data model; root `CLAUDE.md` for working rules (worktrees, TDD, 
   `SimpleNamespace(stop_reason=..., parsed_output=FlashcardDeck(...))`. The suite never needs
   `ANTHROPIC_API_KEY`. Live smoke test only behind `RUN_LIVE_API_TESTS=1`
   (`tests/test_live_api.py`).
-- Upload validation: PDF magic-byte check (`%PDF-`) → 400, ≤20 MB → 413. Map
-  `stop_reason == "max_tokens"` to HTTP 413 "Document too large"; other Anthropic API errors
-  → 502. Missing/empty `ANTHROPIC_API_KEY` → 503 from `get_anthropic_client` (the SDK would
-  otherwise raise a bare `TypeError` → raw 500).
+- Upload validation: PDF magic-byte check (`%PDF-`) → 400, ≤20 MB → 413.
+- Generation error mapping (all raised in `generation/service.py`, mapped in `decks/router.py`):
+  - `DocumentTooLargeError` → **413**. Two triggers: `stop_reason == "max_tokens"`, OR
+    `messages.parse()` raising a `ValidationError` whose type is `json_invalid` (the response
+    JSON was truncated mid-object because output overflowed the 16k token cap — parse raises
+    *before* we can read `stop_reason`, so this MUST be caught or it surfaces as a raw 500).
+  - `MalformedGenerationError` → **502**: a non-truncation `ValidationError` (well-formed JSON
+    that failed the schema — very rare with structured outputs).
+  - `anthropic.APIError` → **502**. Missing/empty `ANTHROPIC_API_KEY` → **503** from
+    `get_anthropic_client`.
+- Logging: `create_app` calls `_configure_logging()` to attach an INFO stderr handler to the
+  `app.*` logger tree (uvicorn doesn't route app loggers otherwise). Generation logs the
+  request + card count; failures log with user/deck/pdf-size context.
 
 ## Commands (run from this directory)
 

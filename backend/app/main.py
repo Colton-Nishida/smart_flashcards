@@ -1,5 +1,7 @@
 """FastAPI app factory and router mounting."""
 
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -9,7 +11,25 @@ from app.decks.router import router as decks_router
 from app.storage import Storage
 
 
+def _configure_logging() -> None:
+    """Give the `app.*` loggers their own stderr handler at INFO.
+
+    Without this, uvicorn doesn't route our application loggers, so INFO-level
+    generation/upload logs stay invisible and failures surface only as bare tracebacks.
+    """
+    app_logger = logging.getLogger("app")
+    if app_logger.handlers:  # idempotent — safe if create_app runs more than once
+        return
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    app_logger.addHandler(handler)
+    app_logger.setLevel(logging.INFO)
+    # Leave propagate=True: uvicorn adds no root handler (so no double-logging), and pytest's
+    # caplog captures via root propagation. Setting it False silently breaks log-assertion tests.
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
+    _configure_logging()
     settings = settings or get_settings()
     app = FastAPI(title="Smart Flashcards API")
     app.state.settings = settings

@@ -1,5 +1,6 @@
 """Deck routes: /api/decks/*. Every route requires an authenticated user."""
 
+import logging
 from typing import Annotated
 
 import anthropic
@@ -12,8 +13,15 @@ from app.decks.models import Card, CardCreate, CardUpdate, Deck, DeckSummary, De
 from app.deps import get_settings, get_storage
 from app.generation import service as generation
 from app.generation.deps import AnthropicClient
-from app.generation.errors import DocumentTooLargeError, InvalidPdfError, PdfTooLargeError
+from app.generation.errors import (
+    DocumentTooLargeError,
+    InvalidPdfError,
+    MalformedGenerationError,
+    PdfTooLargeError,
+)
 from app.storage import Storage, StorageIdError
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/decks", tags=["decks"])
 
@@ -57,10 +65,24 @@ def create_deck(
             model=settings.anthropic_model,
         )
     except DocumentTooLargeError:
+        logger.info(
+            "Upload rejected as too large: user=%s deck=%r pdf_bytes=%d",
+            user["id"],
+            name,
+            len(pdf_bytes),
+        )
         raise HTTPException(
-            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Document too large"
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="That document is too large — it produced more cards than fit in one "
+            "response. Try a shorter PDF or split it into sections.",
         ) from None
-    except anthropic.APIError:
+    except (anthropic.APIError, MalformedGenerationError):
+        logger.exception(
+            "Flashcard generation failed: user=%s deck=%r pdf_bytes=%d",
+            user["id"],
+            name,
+            len(pdf_bytes),
+        )
         raise HTTPException(
             status.HTTP_502_BAD_GATEWAY, detail="Flashcard generation failed; please retry"
         ) from None
