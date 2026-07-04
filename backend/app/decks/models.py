@@ -28,6 +28,9 @@ class Deck(BaseModel):
     description: str
     created_at: str
     source_filename: str
+    # Generation-time guidance the user supplied (focus/scope). "" for decks made before
+    # this field existed or when the user left it blank.
+    additional_instructions: str = ""
     cards: list[Card]
 
 

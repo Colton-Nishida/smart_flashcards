@@ -7,9 +7,12 @@ working rules.
 ## UX (decided — don't re-litigate)
 
 - **Two tabs**: `Upload` and `Decks` (plus a login screen when unauthenticated).
-- **Upload tab**: PDF file picker + deck name + description → synchronous generation with a
-  clear in-progress state (this call takes 15–60s; disable resubmit, show progress copy).
-  The description doubles as guidance to Claude — hint that in the placeholder.
+- **Upload tab**: PDF file picker + deck name + description + optional "additional instructions"
+  → synchronous generation with a clear in-progress state (this call takes 15–60s; disable
+  resubmit, show progress copy). "Additional instructions" is free-text generation guidance
+  (e.g. "focus on the first page", "only cards about X"); it's sent as the
+  `additional_instructions` form field and scopes what Claude covers — cards still come only
+  from the PDF.
 - **Decks tab**: deck list → deck view. Study mode = shuffled flip-through: show front,
   click/space to reveal back, then "again" / "got it"; "again" cards recycle to the end of
   the session. No persisted study results in MVP.

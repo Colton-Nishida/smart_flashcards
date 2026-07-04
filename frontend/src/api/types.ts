@@ -19,6 +19,7 @@ export interface Deck {
   description: string
   created_at: string
   source_filename: string
+  additional_instructions: string
   cards: Card[]
 }
 

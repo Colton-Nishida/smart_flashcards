@@ -31,6 +31,7 @@ def create_deck(
     description: str,
     source_filename: str,
     cards: list[dict[str, Any]],
+    additional_instructions: str = "",
 ) -> dict[str, Any]:
     """Persist a new deck. ``cards`` entries need front/back (+ optional tags)."""
     deck = {
@@ -39,6 +40,7 @@ def create_deck(
         "description": description,
         "created_at": _now_iso(),
         "source_filename": source_filename,
+        "additional_instructions": additional_instructions,
         "cards": [
             {
                 "id": _new_id("c"),

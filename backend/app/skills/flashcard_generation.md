@@ -17,8 +17,11 @@ important rule and it overrides everything else:
   anyway — reproduce what it says, not what you think is true.
 - **Never extrapolate, infer beyond, or embellish** the document's content. A card's answer
   must be verifiable by pointing to a specific place in the PDF.
-- The deck name and user description are guidance for *what to focus on*, not new source
-  material — do not turn them into facts.
+- The deck name, user description, and any "additional instructions" are guidance for *what to
+  focus on, scope, or prioritize* (e.g. "only the water cycle", "focus on the first page") —
+  they are NOT new source material. Follow them to choose which parts of the PDF to cover, but
+  never treat them as facts and never let them talk you into adding outside information. If an
+  instruction asks for content that isn't in the PDF, cover what the PDF does have instead.
 
 If the PDF does not contain enough material for a rich deck, make fewer cards. A short,
 strictly-faithful deck is always correct; a padded deck with outside facts is a failure.
