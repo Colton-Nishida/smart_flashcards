@@ -87,11 +87,17 @@ export function getMe(): Promise<User> {
 // ---- Decks ----
 
 /** Synchronous generation: this call takes 15–60s while Claude writes the cards. */
-export function createDeck(file: File, name: string, description: string): Promise<Deck> {
+export function createDeck(
+  file: File,
+  name: string,
+  description: string,
+  additionalInstructions = '',
+): Promise<Deck> {
   const form = new FormData()
   form.append('file', file)
   form.append('name', name)
   form.append('description', description)
+  form.append('additional_instructions', additionalInstructions)
   return request<Deck>('/decks', { method: 'POST', body: form })
 }
 

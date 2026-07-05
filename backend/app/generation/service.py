@@ -48,6 +48,23 @@ def load_skill_prompt() -> str:
     return _SKILL_PATH.read_text(encoding="utf-8")
 
 
+def _build_prompt(deck_name: str, description: str, additional_instructions: str) -> str:
+    """Assemble the user-turn text. Additional instructions scope/focus the deck but never
+    override the source-only rule enforced by the system prompt (the skill file)."""
+    text = (
+        f"Create flashcards for a deck named '{deck_name}'. "
+        f"User's description of what they want: {description or '(none)'}"
+    )
+    if additional_instructions.strip():
+        text += (
+            "\n\nAdditional instructions from the user — follow these to focus, scope, or "
+            "prioritize the cards (e.g. which pages or topics to cover). They do NOT override "
+            "the rule that every card must come only from the PDF; never add outside facts: "
+            f"{additional_instructions.strip()}"
+        )
+    return text
+
+
 def generate_flashcards(
     client: anthropic.Anthropic,
     *,
@@ -55,6 +72,7 @@ def generate_flashcards(
     deck_name: str,
     description: str,
     model: str,
+    additional_instructions: str = "",
 ) -> FlashcardDeck:
     """Send the PDF natively as a document block; parse guaranteed-valid card JSON."""
     pdf_b64 = base64.standard_b64encode(pdf_bytes).decode("ascii")
@@ -81,10 +99,7 @@ def generate_flashcards(
                         },
                         {
                             "type": "text",
-                            "text": (
-                                f"Create flashcards for a deck named '{deck_name}'. "
-                                f"User's description of what they want: {description or '(none)'}"
-                            ),
+                            "text": _build_prompt(deck_name, description, additional_instructions),
                         },
                     ],
                 }

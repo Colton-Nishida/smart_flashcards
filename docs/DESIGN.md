@@ -142,6 +142,7 @@ smart_flashcards/
   "description": "Cell respiration",
   "created_at": "...",
   "source_filename": "chapter4.pdf",
+  "additional_instructions": "Focus on the first page",
   "cards": [
     { "id": "c_...", "front": "What is glycolysis?", "back": "...", "tags": ["metabolism"] }
   ]
@@ -159,7 +160,7 @@ SQLite/Postgres only touches one layer.
 | `POST /api/auth/login` | verify, set signed session cookie |
 | `POST /api/auth/logout` | clear cookie |
 | `GET  /api/auth/me` | current user |
-| `POST /api/decks` | multipart: `file` (PDF) + `name` + `description` → generates cards, returns deck |
+| `POST /api/decks` | multipart: `file` (PDF) + `name` + `description` + optional `additional_instructions` (generation guidance) → generates cards, returns deck |
 | `GET  /api/decks` | list user's decks (summaries) |
 | `GET  /api/decks/{id}` | full deck with cards |
 | `PATCH /api/decks/{id}` | rename / edit description |

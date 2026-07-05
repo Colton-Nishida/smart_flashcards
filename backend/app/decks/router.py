@@ -44,6 +44,7 @@ def create_deck(
     file: UploadFile,
     name: Annotated[str, Form(min_length=1, max_length=200)],
     description: Annotated[str, Form(max_length=2000)] = "",
+    additional_instructions: Annotated[str, Form(max_length=2000)] = "",
 ) -> Deck:
     """Upload a PDF, generate cards synchronously, persist and return the deck."""
     pdf_bytes = file.file.read()
@@ -63,6 +64,7 @@ def create_deck(
             deck_name=name,
             description=description,
             model=settings.anthropic_model,
+            additional_instructions=additional_instructions,
         )
     except DocumentTooLargeError:
         logger.info(
@@ -94,6 +96,7 @@ def create_deck(
         description=description,
         source_filename=file.filename or "upload.pdf",
         cards=[card.model_dump() for card in generated.cards],
+        additional_instructions=additional_instructions,
     )
     return Deck(**deck)
 

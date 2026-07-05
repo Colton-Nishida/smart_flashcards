@@ -40,6 +40,39 @@ def upload(client, *, data: bytes = PDF_BYTES, name: str = "Bio 101", filename: 
     )
 
 
+def upload_with(client, **fields):
+    data = {"name": "Bio 101", "description": "Cell respiration", **fields}
+    return client.post(
+        "/api/decks",
+        files={"file": ("ch4.pdf", PDF_BYTES, "application/pdf")},
+        data=data,
+    )
+
+
+class TestAdditionalInstructions:
+    def test_forwarded_to_prompt_and_persisted(self, client, mock_anthropic, logged_in_user):
+        resp = upload_with(
+            client, additional_instructions="Only make cards about glycolysis; skip the intro."
+        )
+        assert resp.status_code == 201, resp.text
+        assert (
+            resp.json()["additional_instructions"]
+            == "Only make cards about glycolysis; skip the intro."
+        )
+        text = mock_anthropic.messages.parse.call_args.kwargs["messages"][0]["content"][1]["text"]
+        assert "Only make cards about glycolysis" in text
+
+    def test_optional_defaults_to_empty(self, client, mock_anthropic, logged_in_user):
+        resp = upload(client)  # no additional_instructions sent
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["additional_instructions"] == ""
+
+    def test_too_long_rejected_422(self, client, mock_anthropic, logged_in_user):
+        resp = upload_with(client, additional_instructions="x" * 2001)
+        assert resp.status_code == 422
+        mock_anthropic.messages.parse.assert_not_called()
+
+
 class TestCreateDeck:
     def test_unauthenticated_401(self, client, mock_anthropic):
         assert upload(client).status_code == 401

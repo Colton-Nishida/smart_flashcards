@@ -28,6 +28,7 @@ export default function Upload() {
   const [file, setFile] = useState<File | null>(null)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [additionalInstructions, setAdditionalInstructions] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [generating, setGenerating] = useState(false)
 
@@ -48,7 +49,12 @@ export default function Upload() {
     setError(null)
     setGenerating(true)
     try {
-      const deck = await createDeck(file, name.trim(), description.trim())
+      const deck = await createDeck(
+        file,
+        name.trim(),
+        description.trim(),
+        additionalInstructions.trim(),
+      )
       navigate(`/decks/${deck.id}`)
     } catch (err) {
       setError(friendlyError(err))
@@ -99,10 +105,24 @@ export default function Upload() {
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-              placeholder="What's this deck about? Claude also reads this as guidance — e.g. “focus on definitions and the Krebs cycle, skip the history sidebars”."
+              rows={2}
+              placeholder="What's this deck about? e.g. “Cell respiration, Bio 101 chapter 4”."
               className="mt-1 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
             />
+          </label>
+
+          <label className="block text-sm font-medium text-stone-700">
+            Additional instructions <span className="font-normal text-stone-400">(optional)</span>
+            <textarea
+              value={additionalInstructions}
+              onChange={(e) => setAdditionalInstructions(e.target.value)}
+              rows={3}
+              placeholder="Tell Claude how to build the deck — e.g. “Only make cards about the water cycle”, “Focus on the first page”, or “Skip the summary section”."
+              className="mt-1 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+            />
+            <p className="mt-1 text-xs text-stone-400">
+              Cards are always drawn only from the PDF; this just guides what to focus on.
+            </p>
           </label>
         </fieldset>
 

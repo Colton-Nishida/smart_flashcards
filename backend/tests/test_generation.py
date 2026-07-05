@@ -91,6 +91,33 @@ class TestGenerateFlashcards:
         assert isinstance(deck, FlashcardDeck)
         assert deck.cards[0].front == "Q1"
 
+    def test_additional_instructions_included_in_prompt(self):
+        client = _mock_client()
+        generate_flashcards(
+            client,
+            pdf_bytes=PDF_BYTES,
+            deck_name="Bio",
+            description="",
+            additional_instructions="Focus on the first page only.",
+            model="claude-sonnet-5",
+        )
+        text = client.messages.parse.call_args.kwargs["messages"][0]["content"][1]["text"]
+        assert "Focus on the first page only." in text
+
+    def test_additional_instructions_optional(self):
+        client = _mock_client()
+        deck = generate_flashcards(  # must not raise when omitted
+            client,
+            pdf_bytes=PDF_BYTES,
+            deck_name="Bio",
+            description="",
+            model="claude-sonnet-5",
+        )
+        assert isinstance(deck, FlashcardDeck)
+        # nothing extraneous leaks into the prompt when there are no instructions
+        text = client.messages.parse.call_args.kwargs["messages"][0]["content"][1]["text"]
+        assert "Additional instructions" not in text
+
     def test_request_shape(self):
         client = _mock_client()
         generate_flashcards(
