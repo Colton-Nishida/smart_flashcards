@@ -2,7 +2,22 @@
 // All requests go through `request()`, which sends the session cookie and
 // broadcasts UNAUTHORIZED_EVENT on any 401 so the app can route back to login.
 
-import type { Card, CardInput, CardPatch, Deck, DeckPatch, DeckSummary, User } from './types'
+import type {
+  Card,
+  CardInput,
+  CardPatch,
+  Deck,
+  DeckPatch,
+  DeckSummary,
+  QuizAnswerOut,
+  QuizDisputeOut,
+  QuizFinishOut,
+  QuizQuestionOut,
+  Topic,
+  TopicPatch,
+  TopicSummary,
+  User,
+} from './types'
 
 /** Fired on `window` whenever any API call comes back 401. */
 export const UNAUTHORIZED_EVENT = 'smart-flashcards:unauthorized'
@@ -123,4 +138,60 @@ export function updateCard(deckId: string, cardId: string, patch: CardPatch): Pr
 
 export function deleteCard(deckId: string, cardId: string): Promise<void> {
   return request<void>(`/decks/${deckId}/cards/${cardId}`, { method: 'DELETE' })
+}
+
+// ---- Topics ----
+
+/** Synchronous extraction: takes 15–60s while Claude distills the PDF into notes. */
+export function createTopic(file: File, name: string, description: string): Promise<Topic> {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('name', name)
+  form.append('description', description)
+  return request<Topic>('/topics', { method: 'POST', body: form })
+}
+
+export function listTopics(): Promise<TopicSummary[]> {
+  return request<TopicSummary[]>('/topics')
+}
+
+export function getTopic(topicId: string): Promise<Topic> {
+  return request<Topic>(`/topics/${topicId}`)
+}
+
+export function updateTopic(topicId: string, patch: TopicPatch): Promise<Topic> {
+  return request<Topic>(`/topics/${topicId}`, json('PATCH', patch))
+}
+
+export function deleteTopic(topicId: string): Promise<void> {
+  return request<void>(`/topics/${topicId}`, { method: 'DELETE' })
+}
+
+// ---- Quiz sessions (each call is one Claude turn: expect a few seconds) ----
+
+export function startQuiz(topicId: string, numQuestions: number): Promise<QuizQuestionOut> {
+  return request<QuizQuestionOut>(
+    `/topics/${topicId}/quiz/start`,
+    json('POST', { num_questions: numQuestions }),
+  )
+}
+
+export function answerQuiz(topicId: string, answer: string): Promise<QuizAnswerOut> {
+  return request<QuizAnswerOut>(`/topics/${topicId}/quiz/answer`, json('POST', { answer }))
+}
+
+export function nextQuizQuestion(topicId: string): Promise<QuizQuestionOut> {
+  return request<QuizQuestionOut>(`/topics/${topicId}/quiz/next`, { method: 'POST' })
+}
+
+export function disputeQuiz(topicId: string, message: string): Promise<QuizDisputeOut> {
+  return request<QuizDisputeOut>(`/topics/${topicId}/quiz/dispute`, json('POST', { message }))
+}
+
+export function finishQuiz(topicId: string): Promise<QuizFinishOut> {
+  return request<QuizFinishOut>(`/topics/${topicId}/quiz/finish`, { method: 'POST' })
+}
+
+export function abandonQuiz(topicId: string): Promise<void> {
+  return request<void>(`/topics/${topicId}/quiz`, { method: 'DELETE' })
 }
