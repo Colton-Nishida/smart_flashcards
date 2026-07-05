@@ -47,8 +47,14 @@ npm run dev        # Vite dev server, proxies /api → localhost:8000
 
 - Flashcard generation = single Anthropic API call: PDF sent as a native `document` block,
   output enforced with structured outputs (`client.messages.parse` + Pydantic). No agent loop.
-- The generation prompt is a versioned "skill" file: `backend/app/skills/flashcard_generation.md`.
-  Card-quality tuning happens there, not in code.
+  The dynamic quiz (Topics tab) follows the same pattern: every step (notes extraction,
+  question, grading, dispute, scoring) is one structured-output call; session state lives on
+  the topic JSON, not in an agent loop.
+- All LLM prompts are versioned "skill" files under `backend/app/skills/`
+  (`flashcard_generation`, `topic_notes_extraction`, `quiz_question`, `quiz_grading`,
+  `quiz_dispute`, `quiz_scoring`). Output-quality tuning happens there, not in code.
+- Non-streaming Anthropic calls must keep `max_tokens <= 21000` — the SDK rejects more at
+  request time, and only live calls (not mocked tests) catch it.
 - Model comes from `ANTHROPIC_MODEL` env (default `claude-sonnet-5`). Never hardcode model IDs
   in application code.
 - Secrets (`ANTHROPIC_API_KEY`, `SESSION_SECRET`) come from env / `.env` (gitignored).
