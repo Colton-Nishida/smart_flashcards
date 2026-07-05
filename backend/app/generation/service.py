@@ -20,10 +20,11 @@ logger = logging.getLogger(__name__)
 MAX_PDF_BYTES = 20 * 1024 * 1024  # practical cap, well under the 32 MB API limit
 _PDF_MAGIC = b"%PDF-"
 _SKILL_PATH = Path(__file__).resolve().parent.parent / "skills" / "flashcard_generation.md"
-# Output-token budget for one generation call. Kept under the SDK's non-streaming
-# timeout guard (which rejects very large max_tokens on a blocking request). The model
-# supports up to 128k, but going that high requires switching to a streaming call.
-_MAX_OUTPUT_TOKENS = 32000
+# Output-token budget for one generation call. The SDK's non-streaming guard rejects
+# any blocking request whose max_tokens implies >10 minutes at its assumed worst-case
+# speed (128k tokens/hour), i.e. anything over 21_333 raises ValueError at request
+# time. 21000 is the largest safe budget; going higher requires a streaming call.
+_MAX_OUTPUT_TOKENS = 21000
 
 
 def _is_truncated_json(exc: ValidationError) -> bool:

@@ -26,8 +26,9 @@ logger = logging.getLogger(__name__)
 
 _SKILLS_DIR = Path(__file__).resolve().parent.parent / "skills"
 
-# The notes doc for a whole PDF can be long; quiz turns are small.
-_EXTRACTION_MAX_TOKENS = 32000
+# The notes doc for a whole PDF can be long; quiz turns are small. 21000 is the
+# largest max_tokens the SDK allows on a non-streaming call (see generation.service).
+_EXTRACTION_MAX_TOKENS = 21000
 _TURN_MAX_TOKENS = 4000
 
 T = TypeVar("T", bound=BaseModel)
