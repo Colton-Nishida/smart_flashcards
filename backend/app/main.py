@@ -8,7 +8,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.auth.router import router as auth_router
 from app.config import Settings, get_settings
 from app.decks.router import router as decks_router
+from app.quiz.router import router as quiz_router
 from app.storage import Storage
+from app.topics.router import router as topics_router
 
 
 def _configure_logging() -> None:
@@ -45,6 +47,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(auth_router)
     app.include_router(decks_router)
+    app.include_router(topics_router)
+    app.include_router(quiz_router)
     return app
 
 

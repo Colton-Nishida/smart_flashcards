@@ -44,8 +44,23 @@ def _read_json(path: Path) -> dict[str, Any] | None:
         return None
 
 
+def _atomic_write_bytes(path: Path, data: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_name, path)
+    except BaseException:
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(tmp_name)
+        raise
+
+
 class Storage:
-    """File-backed persistence for users and decks."""
+    """File-backed persistence for users, decks, and topics."""
 
     def __init__(self, data_dir: Path | str) -> None:
         self.data_dir = Path(data_dir)
@@ -94,3 +109,49 @@ class Storage:
         except FileNotFoundError:
             return False
         return True
+
+    # -- topics -----------------------------------------------------------
+
+    def _topic_dir(self, user_id: str) -> Path:
+        return self.data_dir / "topics" / _check_id(user_id)
+
+    def _topic_path(self, user_id: str, topic_id: str) -> Path:
+        return self._topic_dir(user_id) / f"{_check_id(topic_id)}.json"
+
+    def _topic_pdf_path(self, user_id: str, topic_id: str) -> Path:
+        return self._topic_dir(user_id) / f"{_check_id(topic_id)}.pdf"
+
+    def read_topic(self, user_id: str, topic_id: str) -> dict[str, Any] | None:
+        return _read_json(self._topic_path(user_id, topic_id))
+
+    def write_topic(self, user_id: str, topic: dict[str, Any]) -> None:
+        _atomic_write_json(self._topic_path(user_id, topic["id"]), topic)
+
+    def list_topics(self, user_id: str) -> list[dict[str, Any]]:
+        topic_dir = self._topic_dir(user_id)
+        if not topic_dir.is_dir():
+            return []
+        topics = []
+        for path in sorted(topic_dir.glob("*.json")):
+            topic = _read_json(path)
+            if topic is not None:
+                topics.append(topic)
+        return topics
+
+    def delete_topic(self, user_id: str, topic_id: str) -> bool:
+        with contextlib.suppress(FileNotFoundError):
+            self._topic_pdf_path(user_id, topic_id).unlink()
+        try:
+            self._topic_path(user_id, topic_id).unlink()
+        except FileNotFoundError:
+            return False
+        return True
+
+    def read_topic_pdf(self, user_id: str, topic_id: str) -> bytes | None:
+        try:
+            return self._topic_pdf_path(user_id, topic_id).read_bytes()
+        except FileNotFoundError:
+            return None
+
+    def write_topic_pdf(self, user_id: str, topic_id: str, data: bytes) -> None:
+        _atomic_write_bytes(self._topic_pdf_path(user_id, topic_id), data)
