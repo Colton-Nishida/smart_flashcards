@@ -14,10 +14,10 @@ from app.auth.deps import CurrentUser
 from app.config import Settings
 from app.deps import get_settings, get_storage
 from app.generation.deps import AnthropicClient
+from app.generation.http import llm_errors
 from app.quiz import agent
 from app.storage import Storage, StorageIdError
 from app.topics import service
-from app.topics.errors import llm_errors
 from app.topics.models import (
     QuizAnswer,
     QuizAnswerOut,
@@ -56,9 +56,15 @@ def start_quiz(
     settings: SettingsDep,
     client: AnthropicClient,
 ) -> QuizQuestionOut:
-    """Begin a session (replacing any in progress) and ask the first question."""
+    """Begin a session and ask the first question. 409s on an in-progress session
+    unless the client explicitly asks to replace it."""
     topic = _load_topic(storage, user["id"], topic_id)
-    session = service.begin_session(topic, total_questions=body.num_questions)
+    try:
+        session = service.begin_session(
+            topic, total_questions=body.num_questions, replace=body.replace
+        )
+    except service.QuizStateError as exc:
+        raise _409(exc) from None
     with llm_errors("question generation"):
         question = agent.generate_question(client, topic=topic, model=settings.anthropic_model)
     number = service.add_question(storage, user["id"], topic, question=question.question)
@@ -81,6 +87,9 @@ def answer_question(
 ) -> QuizAnswerOut:
     topic = _load_topic(storage, user["id"], topic_id)
     try:
+        service.verify_binding(
+            topic, session_id=body.session_id, question_number=body.question_number
+        )
         entry = service.current_question(topic)
     except service.QuizStateError as exc:
         raise _409(exc) from None
@@ -142,6 +151,9 @@ def dispute_grade(
     """The user pushes back on the latest grade; the agent rules and takes notes."""
     topic = _load_topic(storage, user["id"], topic_id)
     try:
+        service.verify_binding(
+            topic, session_id=body.session_id, question_number=body.question_number
+        )
         entry = service.latest_graded(topic)
     except service.QuizStateError as exc:
         raise _409(exc) from None
@@ -149,11 +161,14 @@ def dispute_grade(
         verdict = agent.evaluate_dispute(
             client, topic=topic, entry=entry, message=body.message, model=settings.anthropic_model
         )
-    final_grade, notes_updated = service.record_dispute(
+    effective_verdict, final_grade, notes_updated = service.record_dispute(
         storage, user["id"], topic, message=body.message, verdict=verdict
     )
     return QuizDisputeOut(
-        verdict=verdict.verdict, grade=final_grade, reply=verdict.reply, notes_updated=notes_updated
+        verdict=effective_verdict,
+        grade=final_grade,
+        reply=verdict.reply,
+        notes_updated=notes_updated,
     )
 
 

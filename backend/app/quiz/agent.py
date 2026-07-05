@@ -4,7 +4,6 @@ No agent loop — session state lives in the topic JSON, and every call gets the
 context it needs (notes doc, mastery memory, session transcript) rebuilt as text.
 """
 
-import base64
 import logging
 from pathlib import Path
 from typing import Any, TypeVar
@@ -13,7 +12,7 @@ import anthropic
 from pydantic import BaseModel, ValidationError
 
 from app.generation.errors import DocumentTooLargeError, MalformedGenerationError
-from app.generation.service import _is_truncated_json
+from app.generation.service import is_truncated_json, pdf_document_block
 from app.quiz.models import (
     AnswerGrade,
     DisputeVerdict,
@@ -58,7 +57,7 @@ def _parse(
             output_format=output_format,
         )
     except ValidationError as exc:
-        if _is_truncated_json(exc):
+        if is_truncated_json(exc):
             logger.warning("Quiz call truncated at %d tokens: skill=%s", max_tokens, skill)
             raise truncation_error("The response overflowed the output limit.") from exc
         logger.exception("Quiz call failed schema validation: skill=%s", skill)
@@ -101,7 +100,6 @@ def extract_topic_notes(
     model: str,
 ) -> TopicNotes:
     """Distill the uploaded PDF into the markdown notes doc the quiz runs off."""
-    pdf_b64 = base64.standard_b64encode(pdf_bytes).decode("ascii")
     logger.info(
         "Extracting topic notes: model=%s pdf_bytes=%d topic=%r", model, len(pdf_bytes), topic_name
     )
@@ -110,14 +108,7 @@ def extract_topic_notes(
         model=model,
         skill="topic_notes_extraction",
         content=[
-            {
-                "type": "document",
-                "source": {
-                    "type": "base64",
-                    "media_type": "application/pdf",
-                    "data": pdf_b64,
-                },
-            },
+            pdf_document_block(pdf_bytes),
             {
                 "type": "text",
                 "text": (

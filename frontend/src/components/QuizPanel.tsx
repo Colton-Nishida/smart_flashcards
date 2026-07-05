@@ -91,6 +91,9 @@ export default function QuizPanel({ topicId, onTopicMutated }: QuizPanelProps) {
   const [numQuestions, setNumQuestions] = useState('5')
   const [isLast, setIsLast] = useState(false)
   const [answeredCount, setAnsweredCount] = useState(0)
+  // Server-side binding: lets the backend reject writes from a stale tab.
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [questionNumber, setQuestionNumber] = useState(0)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -117,6 +120,8 @@ export default function QuizPanel({ topicId, onTopicMutated }: QuizPanelProps) {
           setPhase(session.status === 'awaiting_answer' ? 'answering' : 'graded')
           setIsLast(session.questions.length >= session.total_questions)
           setAnsweredCount(session.questions.filter((q) => q.answer !== null).length)
+          setSessionId(session.id)
+          setQuestionNumber(session.questions.length)
         }
       })
       .catch((err) => {
@@ -169,6 +174,8 @@ export default function QuizPanel({ topicId, onTopicMutated }: QuizPanelProps) {
       setPhase('answering')
       setIsLast(q.question_number >= q.total_questions)
       setAnsweredCount(0)
+      setSessionId(q.session_id)
+      setQuestionNumber(q.question_number)
       onTopicMutated()
     } catch (err) {
       setError(errorMessage(err))
@@ -178,12 +185,16 @@ export default function QuizPanel({ topicId, onTopicMutated }: QuizPanelProps) {
   }
 
   async function handleAnswer(text: string) {
+    if (!sessionId) return
     push(msg({ role: 'user', text }))
     setInput('')
     setBusy('Grading your answer…')
     setError(null)
     try {
-      const graded = await answerQuiz(topicId, text)
+      const graded = await answerQuiz(topicId, text, {
+        session_id: sessionId,
+        question_number: questionNumber,
+      })
       push(msg({ role: 'agent', text: graded.feedback, grade: graded.grade }))
       setPhase('graded')
       setIsLast(graded.is_last)
@@ -198,13 +209,17 @@ export default function QuizPanel({ topicId, onTopicMutated }: QuizPanelProps) {
   }
 
   async function handleDispute(text: string) {
+    if (!sessionId) return
     push(msg({ role: 'user', text }))
     setInput('')
     setDisputing(false)
     setBusy('Reconsidering…')
     setError(null)
     try {
-      const ruling = await disputeQuiz(topicId, text)
+      const ruling = await disputeQuiz(topicId, text, {
+        session_id: sessionId,
+        question_number: questionNumber,
+      })
       const heading =
         ruling.verdict === 'revised'
           ? `Grade revised to ${GRADE_LABELS[ruling.grade]}`
@@ -240,6 +255,7 @@ export default function QuizPanel({ topicId, onTopicMutated }: QuizPanelProps) {
       )
       setPhase('answering')
       setIsLast(q.question_number >= q.total_questions)
+      setQuestionNumber(q.question_number)
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -393,7 +409,15 @@ export default function QuizPanel({ topicId, onTopicMutated }: QuizPanelProps) {
             )}
 
             {phase === 'done' && !busy && (
-              <ActionButton primary onClick={() => setPhase('setup')}>
+              <ActionButton
+                primary
+                onClick={() => {
+                  // Clear the finished transcript so the setup card is actually visible
+                  // (it mounts at the top of a container scrolled to the bottom).
+                  setMessages([])
+                  setPhase('setup')
+                }}
+              >
                 Start another session
               </ActionButton>
             )}
@@ -605,7 +629,17 @@ function NotesTab({ topic }: { topic: Topic }) {
 
       <section>
         <h3 className="text-xs font-semibold uppercase tracking-wide text-stone-400">
-          Study notes (extracted from {topic.source_filename})
+          Study notes (extracted from{' '}
+          <a
+            href={`/api/topics/${topic.id}/pdf`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-accent hover:underline"
+            title="Open the original PDF"
+          >
+            {topic.source_filename}
+          </a>
+          )
         </h3>
         <pre className="mt-2 whitespace-pre-wrap rounded-lg border border-stone-200 bg-white p-4 font-sans text-sm text-stone-700">
           {topic.notes_md}

@@ -62,8 +62,11 @@ def topic(client, mock_anthropic, logged_in_user) -> dict:
     return resp.json()
 
 
-def start(client, topic_id, num_questions=3):
-    return client.post(f"/api/topics/{topic_id}/quiz/start", json={"num_questions": num_questions})
+def start(client, topic_id, num_questions=3, replace=False):
+    return client.post(
+        f"/api/topics/{topic_id}/quiz/start",
+        json={"num_questions": num_questions, "replace": replace},
+    )
 
 
 def answer(client, topic_id, text="Red and blue light"):
@@ -101,13 +104,23 @@ class TestStart:
         assert start(client, topic["id"], num_questions=0).status_code == 422
         assert start(client, topic["id"], num_questions=26).status_code == 422
 
-    def test_start_replaces_existing_session(self, client, topic):
+    def test_start_with_replace_swaps_session(self, client, topic):
         first = start(client, topic["id"]).json()["session_id"]
-        second = start(client, topic["id"], num_questions=5).json()
+        second = start(client, topic["id"], num_questions=5, replace=True).json()
         assert second["session_id"] != first
         detail = client.get(f"/api/topics/{topic['id']}").json()
         assert detail["active_session"]["total_questions"] == 5
         assert len(detail["active_session"]["questions"]) == 1
+
+    def test_start_without_replace_conflicts_with_active_session(self, client, topic):
+        """A stale tab must not silently destroy an in-progress session."""
+        start(client, topic["id"])
+        answer(client, topic["id"])
+        resp = start(client, topic["id"])
+        assert resp.status_code == 409
+        # the original session survives untouched
+        session = client.get(f"/api/topics/{topic['id']}").json()["active_session"]
+        assert session["questions"][0]["answer"] == "Red and blue light"
 
     def test_missing_topic_404(self, client, logged_in_user, mock_anthropic):
         assert start(client, "t_missing").status_code == 404
@@ -160,6 +173,36 @@ class TestAnswer:
     def test_empty_answer_422(self, client, topic):
         start(client, topic["id"])
         assert answer(client, topic["id"], "").status_code == 422
+
+    def test_stale_session_binding_409(self, client, topic):
+        """An answer carrying another session's id must be rejected, not misrecorded."""
+        start(client, topic["id"])
+        resp = client.post(
+            f"/api/topics/{topic['id']}/quiz/answer",
+            json={"answer": "Red light", "session_id": "q_stale", "question_number": 1},
+        )
+        assert resp.status_code == 409
+        session = client.get(f"/api/topics/{topic['id']}").json()["active_session"]
+        assert session["questions"][0]["answer"] is None
+
+    def test_stale_question_number_409(self, client, topic):
+        """An answer for question 1 must not be graded against question 2."""
+        session_id = start(client, topic["id"]).json()["session_id"]
+        answer(client, topic["id"])
+        client.post(f"/api/topics/{topic['id']}/quiz/next")
+        resp = client.post(
+            f"/api/topics/{topic['id']}/quiz/answer",
+            json={"answer": "Late answer", "session_id": session_id, "question_number": 1},
+        )
+        assert resp.status_code == 409
+
+    def test_matching_binding_accepted(self, client, topic):
+        session_id = start(client, topic["id"]).json()["session_id"]
+        resp = client.post(
+            f"/api/topics/{topic['id']}/quiz/answer",
+            json={"answer": "Red light", "session_id": session_id, "question_number": 1},
+        )
+        assert resp.status_code == 200
 
 
 class TestNext:
@@ -240,6 +283,34 @@ class TestDispute:
         notes = client.get(f"/api/topics/{topic['id']}").json()["notes_md"]
         assert "Chlorophyll a and b absorb slightly different wavelengths." in notes
         assert NOTES_MD in notes  # original content untouched
+
+    def test_revised_without_grade_reports_upheld(self, client, topic, mock_anthropic):
+        """A 'revision' that names no new grade must not tell the user their grade changed."""
+        mock_anthropic._outputs[AnswerGrade] = AnswerGrade(grade="bad", feedback="Wrong.")
+        mock_anthropic._outputs[DisputeVerdict] = DisputeVerdict(
+            verdict="revised", revised_grade=None, reply="Hmm.", correction_note=None
+        )
+        start(client, topic["id"])
+        answer(client, topic["id"])
+        body = self.dispute(client, topic["id"]).json()
+        assert body["verdict"] == "upheld"
+        assert body["grade"] == "bad"
+
+    def test_dispute_can_never_lower_a_grade(self, client, topic, mock_anthropic):
+        mock_anthropic._outputs[AnswerGrade] = AnswerGrade(grade="ok", feedback="Partial.")
+        mock_anthropic._outputs[DisputeVerdict] = DisputeVerdict(
+            verdict="revised",
+            revised_grade="bad",
+            reply="Worse than I thought.",
+            correction_note=None,
+        )
+        start(client, topic["id"])
+        answer(client, topic["id"])
+        body = self.dispute(client, topic["id"]).json()
+        assert body["verdict"] == "upheld"
+        assert body["grade"] == "ok"
+        session = client.get(f"/api/topics/{topic['id']}").json()["active_session"]
+        assert session["questions"][0]["grade"] == "ok"
 
     def test_dispute_while_awaiting_answer_409(self, client, topic):
         start(client, topic["id"])

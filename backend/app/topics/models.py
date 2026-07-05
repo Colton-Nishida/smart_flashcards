@@ -77,13 +77,23 @@ class TopicUpdate(BaseModel):
 
 class QuizStart(BaseModel):
     num_questions: int = Field(ge=1, le=25)
+    replace: bool = False
+    """Explicit consent to discard an in-progress session (otherwise 409)."""
 
 
-class QuizAnswer(BaseModel):
+class _SessionBound(BaseModel):
+    """Optional optimistic-concurrency binding: when present, the write is rejected
+    if another tab/device has moved the session past this point."""
+
+    session_id: str | None = None
+    question_number: int | None = Field(default=None, ge=1)
+
+
+class QuizAnswer(_SessionBound):
     answer: str = Field(min_length=1, max_length=5000)
 
 
-class QuizDispute(BaseModel):
+class QuizDispute(_SessionBound):
     message: str = Field(min_length=1, max_length=5000)
 
 

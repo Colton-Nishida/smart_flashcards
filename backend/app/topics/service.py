@@ -67,8 +67,9 @@ def create_topic(
         "sessions": [],
         "active_session": None,
     }
-    storage.write_topic(user_id, topic)
+    # PDF first: if it fails, no topic record exists; an orphaned PDF is harmless.
     storage.write_topic_pdf(user_id, topic["id"], pdf_bytes)
+    storage.write_topic(user_id, topic)
     return topic
 
 
@@ -130,8 +131,24 @@ def _require_status(topic: dict[str, Any], status: str) -> dict[str, Any]:
     return session
 
 
-def begin_session(topic: dict[str, Any], *, total_questions: int) -> dict[str, Any]:
-    """Attach a fresh (unpersisted) session; replaces any session in progress."""
+def verify_binding(
+    topic: dict[str, Any], *, session_id: str | None, question_number: int | None
+) -> None:
+    """Reject writes from a stale client (another tab/device moved the session on)."""
+    session = _active_session(topic)
+    if session_id is not None and session_id != session["id"]:
+        raise QuizStateError("That quiz session is no longer active")
+    if question_number is not None and question_number != len(session["questions"]):
+        raise QuizStateError("The session has moved past that question")
+
+
+def begin_session(
+    topic: dict[str, Any], *, total_questions: int, replace: bool = False
+) -> dict[str, Any]:
+    """Attach a fresh (unpersisted) session. Refuses to clobber one in progress
+    unless ``replace`` is set."""
+    if topic["active_session"] is not None and not replace:
+        raise QuizStateError("A quiz session is already in progress for this topic")
     session = {
         "id": _new_id("q"),
         "started_at": _now_iso(),
@@ -194,6 +211,9 @@ def latest_graded(topic: dict[str, Any]) -> dict[str, Any]:
     return session["questions"][-1]
 
 
+_GRADE_ORDER = {"bad": 0, "ok": 1, "good": 2}
+
+
 def record_dispute(
     storage: Storage,
     user_id: str,
@@ -201,23 +221,32 @@ def record_dispute(
     *,
     message: str,
     verdict: DisputeVerdict,
-) -> tuple[str, bool]:
+) -> tuple[str, str, bool]:
     """Apply a dispute ruling to the latest graded question.
 
-    Returns (final_grade, notes_updated).
+    A "revised" verdict only counts if it actually raises the grade — a dispute may
+    never lower one, and a revision that names no (or the same) grade is reported as
+    upheld so the user is never told their grade changed when it didn't.
+
+    Returns (effective_verdict, final_grade, notes_updated).
     """
     entry = latest_graded(topic)
+    effective_verdict = verdict.verdict
+    if effective_verdict == "revised":
+        revised = verdict.revised_grade
+        if revised is not None and _GRADE_ORDER[revised] > _GRADE_ORDER[entry["grade"]]:
+            entry["grade"] = revised
+        else:
+            effective_verdict = "upheld"
     entry["disputes"].append(
-        {"message": message, "verdict": verdict.verdict, "reply": verdict.reply}
+        {"message": message, "verdict": effective_verdict, "reply": verdict.reply}
     )
-    if verdict.verdict == "revised" and verdict.revised_grade is not None:
-        entry["grade"] = verdict.revised_grade
     notes_updated = False
     if verdict.correction_note:
         topic["notes_md"] = _append_correction(topic["notes_md"], verdict.correction_note)
         notes_updated = True
     _save(storage, user_id, topic)
-    return entry["grade"], notes_updated
+    return effective_verdict, entry["grade"], notes_updated
 
 
 def _append_correction(notes_md: str, correction: str) -> str:

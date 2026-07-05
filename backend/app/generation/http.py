@@ -1,4 +1,4 @@
-"""Shared HTTP mapping for topic/quiz LLM-call failures."""
+"""Shared HTTP mapping for LLM-call failures (used by the topic and quiz routes)."""
 
 import logging
 from collections.abc import Iterator

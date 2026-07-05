@@ -11,10 +11,10 @@ from app.deps import get_settings, get_storage
 from app.generation import service as generation
 from app.generation.deps import AnthropicClient
 from app.generation.errors import InvalidPdfError, PdfTooLargeError
+from app.generation.http import llm_errors
 from app.quiz import agent
 from app.storage import Storage, StorageIdError
 from app.topics import service
-from app.topics.errors import llm_errors
 from app.topics.models import Topic, TopicSummary, TopicUpdate
 
 logger = logging.getLogger(__name__)

@@ -169,23 +169,47 @@ export function deleteTopic(topicId: string): Promise<void> {
 
 // ---- Quiz sessions (each call is one Claude turn: expect a few seconds) ----
 
-export function startQuiz(topicId: string, numQuestions: number): Promise<QuizQuestionOut> {
+export function startQuiz(
+  topicId: string,
+  numQuestions: number,
+  replace = false,
+): Promise<QuizQuestionOut> {
   return request<QuizQuestionOut>(
     `/topics/${topicId}/quiz/start`,
-    json('POST', { num_questions: numQuestions }),
+    json('POST', { num_questions: numQuestions, replace }),
   )
 }
 
-export function answerQuiz(topicId: string, answer: string): Promise<QuizAnswerOut> {
-  return request<QuizAnswerOut>(`/topics/${topicId}/quiz/answer`, json('POST', { answer }))
+/** session/question binding lets the server reject writes from a stale tab. */
+export interface QuizBinding {
+  session_id: string
+  question_number: number
+}
+
+export function answerQuiz(
+  topicId: string,
+  answer: string,
+  binding: QuizBinding,
+): Promise<QuizAnswerOut> {
+  return request<QuizAnswerOut>(
+    `/topics/${topicId}/quiz/answer`,
+    json('POST', { answer, ...binding }),
+  )
 }
 
 export function nextQuizQuestion(topicId: string): Promise<QuizQuestionOut> {
   return request<QuizQuestionOut>(`/topics/${topicId}/quiz/next`, { method: 'POST' })
 }
 
-export function disputeQuiz(topicId: string, message: string): Promise<QuizDisputeOut> {
-  return request<QuizDisputeOut>(`/topics/${topicId}/quiz/dispute`, json('POST', { message }))
+export function disputeQuiz(
+  topicId: string,
+  message: string,
+  binding: QuizBinding,
+): Promise<QuizDisputeOut> {
+  return request<QuizDisputeOut>(
+    `/topics/${topicId}/quiz/dispute`,
+    json('POST', { message, ...binding }),
+  )
 }
 
 export function finishQuiz(topicId: string): Promise<QuizFinishOut> {

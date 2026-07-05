@@ -136,6 +136,17 @@ class TestCreateTopic:
         create_topic(client)
         assert client.get("/api/topics").json() == []
 
+    def test_pdf_write_failure_persists_no_topic(
+        self, client, mock_anthropic, logged_in_user, monkeypatch
+    ):
+        """The PDF is written before the topic JSON, so a failed PDF write leaves nothing."""
+        monkeypatch.setattr(
+            Storage, "write_topic_pdf", lambda *a, **k: (_ for _ in ()).throw(OSError("disk"))
+        )
+        with pytest.raises(OSError):
+            create_topic(client)
+        assert client.get("/api/topics").json() == []
+
     def test_missing_name_422(self, client, mock_anthropic, logged_in_user):
         resp = client.post(
             "/api/topics",
