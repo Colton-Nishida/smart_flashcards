@@ -40,6 +40,7 @@ def create_topic(
     file: UploadFile,
     name: Annotated[str, Form(min_length=1, max_length=200)],
     description: Annotated[str, Form(max_length=2000)] = "",
+    instructions: Annotated[str, Form(max_length=4000)] = "",
 ) -> Topic:
     """Upload a PDF, extract the study-notes doc synchronously, persist the topic."""
     pdf_bytes = file.file.read()
@@ -58,6 +59,7 @@ def create_topic(
             pdf_bytes=pdf_bytes,
             topic_name=name,
             description=description,
+            instructions=instructions,
             model=settings.anthropic_model,
         )
 
@@ -66,6 +68,7 @@ def create_topic(
         user["id"],
         name=name,
         description=description,
+        instructions=instructions,
         source_filename=file.filename or "upload.pdf",
         notes_md=extracted.notes_md,
         pdf_bytes=pdf_bytes,
@@ -92,7 +95,12 @@ def update_topic(
 ) -> Topic:
     try:
         topic = service.update_topic(
-            storage, user["id"], topic_id, name=update.name, description=update.description
+            storage,
+            user["id"],
+            topic_id,
+            name=update.name,
+            description=update.description,
+            instructions=update.instructions,
         )
         return Topic(**topic)
     except _NOT_FOUND:

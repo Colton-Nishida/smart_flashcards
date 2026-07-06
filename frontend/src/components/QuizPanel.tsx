@@ -593,6 +593,15 @@ function ActionButton({
 function NotesTab({ topic }: { topic: Topic }) {
   return (
     <div className="flex-1 space-y-5 overflow-y-auto px-4 py-4">
+      {topic.instructions && (
+        <section className="rounded-lg border border-stone-200 bg-paper/60 p-4">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-stone-400">
+            Your instructions to the tutor
+          </h3>
+          <p className="mt-2 whitespace-pre-wrap text-sm text-stone-700">{topic.instructions}</p>
+        </section>
+      )}
+
       <section className="rounded-lg border border-stone-200 bg-paper/60 p-4">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-stone-400">
           Why this score — the tutor's memory

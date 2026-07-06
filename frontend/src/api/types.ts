@@ -93,6 +93,8 @@ export interface Topic {
   created_at: string
   updated_at: string
   source_filename: string
+  /** Standing guidance to the tutor (focus areas, question style). */
+  instructions: string
   notes_md: string
   mastery_score: number
   mastery_notes: string
@@ -115,6 +117,7 @@ export interface TopicSummary {
 export interface TopicPatch {
   name?: string
   description?: string
+  instructions?: string
 }
 
 export interface QuizQuestionOut {

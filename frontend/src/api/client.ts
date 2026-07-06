@@ -151,11 +151,17 @@ export function deleteCard(deckId: string, cardId: string): Promise<void> {
 // ---- Topics ----
 
 /** Synchronous extraction: takes 15–60s while Claude distills the PDF into notes. */
-export function createTopic(file: File, name: string, description: string): Promise<Topic> {
+export function createTopic(
+  file: File,
+  name: string,
+  description: string,
+  instructions = '',
+): Promise<Topic> {
   const form = new FormData()
   form.append('file', file)
   form.append('name', name)
   form.append('description', description)
+  form.append('instructions', instructions)
   return request<Topic>('/topics', { method: 'POST', body: form })
 }
 
