@@ -156,8 +156,10 @@ smart_flashcards/
   "description": "...",
   "created_at": "...", "updated_at": "...",
   "source_filename": "water_cycle.pdf",
-  "instructions": "...",          // standing guidance to the tutor (focus/question style);
-                                   // injected into extraction + every quiz call
+  "instructions": "...",          // standing guidance to the tutor (focus/question style).
+                                   // Used by extraction AT UPLOAD TIME and by every quiz
+                                   // call thereafter; editing later only affects quiz calls
+                                   // (the notes doc is not re-extracted).
   "notes_md": "# ...",            // Claude-extracted study notes; quiz source of truth.
                                    // Dispute corrections append to a "Corrections &
                                    // clarifications" section.

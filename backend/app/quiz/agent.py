@@ -89,7 +89,7 @@ def _topic_context(topic: dict[str, Any]) -> str:
         f"## Study notes\n\n{topic['notes_md']}\n\n"
         f"## Mastery memory (current score {topic['mastery_score']}/100)\n\n{memory}"
     )
-    # .get(): topics stored before the field existed may reach here without it.
+    # Storage backfills the field on read; .get() is belt-and-braces for hand-built dicts.
     if instructions := topic.get("instructions"):
         context += f"\n\n## Student's standing instructions\n\n{instructions}"
     return context

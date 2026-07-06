@@ -76,11 +76,10 @@ def create_topic(
 
 
 def get_topic(storage: Storage, user_id: str, topic_id: str) -> dict[str, Any]:
+    # Legacy-field backfill (e.g. `instructions`) happens in Storage._normalize_topic.
     topic = storage.read_topic(user_id, topic_id)
     if topic is None:
         raise TopicNotFoundError(topic_id)
-    # Topics stored before the instructions field existed lack the key.
-    topic.setdefault("instructions", "")
     return topic
 
 

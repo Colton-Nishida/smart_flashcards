@@ -52,8 +52,10 @@ class TestTopicStorage:
         storage = Storage(tmp_path)
         topic = {"id": "t_abc", "name": "X"}
         storage.write_topic("u1", topic)
-        assert storage.read_topic("u1", "t_abc") == topic
-        assert storage.list_topics("u1") == [topic]
+        # Reads normalize legacy topics: missing post-launch fields get backfilled.
+        expected = {**topic, "instructions": ""}
+        assert storage.read_topic("u1", "t_abc") == expected
+        assert storage.list_topics("u1") == [expected]
         assert storage.delete_topic("u1", "t_abc") is True
         assert storage.read_topic("u1", "t_abc") is None
 

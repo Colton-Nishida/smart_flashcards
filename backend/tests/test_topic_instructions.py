@@ -10,10 +10,12 @@ import pytest
 from app.generation.deps import get_anthropic_client
 from app.quiz.models import (
     AnswerGrade,
+    DisputeVerdict,
     MasteryUpdate,
     QuizQuestion,
     TopicNotes,
 )
+from app.storage import Storage
 
 PDF_BYTES = b"%PDF-1.4 fake pdf content for testing"
 INSTRUCTIONS = "Only focus on chapter 2. Ask definition-style questions only."
@@ -30,6 +32,9 @@ def mock_anthropic(app) -> MagicMock:
         TopicNotes: TopicNotes(notes_md="# Notes\n\nChlorophyll absorbs light."),
         QuizQuestion: QuizQuestion(question="What does chlorophyll absorb?"),
         AnswerGrade: AnswerGrade(grade="good", feedback="Right."),
+        DisputeVerdict: DisputeVerdict(
+            verdict="upheld", revised_grade=None, reply="Stands.", correction_note=None
+        ),
         MasteryUpdate: MasteryUpdate(
             score=50, mastery_notes="Fine.", session_summary="One question."
         ),
@@ -103,6 +108,14 @@ class TestPatchInstructions:
 
 
 class TestBackCompat:
+    def test_storage_backfills_missing_field_on_read(self, tmp_path):
+        """The compat rule lives once, at the storage seam — every read path gets it."""
+        storage = Storage(tmp_path)
+        storage.write_topic("u1", {"id": "t_old", "name": "Legacy"})
+        assert storage.read_topic("u1", "t_old")["instructions"] == ""
+        [topic] = storage.list_topics("u1")
+        assert topic["instructions"] == ""
+
     def test_topic_stored_before_field_existed_still_loads(
         self, app, client, mock_anthropic, logged_in_user
     ):
@@ -142,6 +155,12 @@ class TestQuizCallsSeeInstructions:
     def test_grading_prompt(self, client, topic, mock_anthropic):
         client.post(f"/api/topics/{topic['id']}/quiz/start", json={"num_questions": 2})
         client.post(f"/api/topics/{topic['id']}/quiz/answer", json={"answer": "Light"})
+        assert INSTRUCTIONS in last_prompt_text(mock_anthropic)
+
+    def test_dispute_prompt(self, client, topic, mock_anthropic):
+        client.post(f"/api/topics/{topic['id']}/quiz/start", json={"num_questions": 2})
+        client.post(f"/api/topics/{topic['id']}/quiz/answer", json={"answer": "Light"})
+        client.post(f"/api/topics/{topic['id']}/quiz/dispute", json={"message": "Too harsh"})
         assert INSTRUCTIONS in last_prompt_text(mock_anthropic)
 
     def test_scoring_prompt(self, client, topic, mock_anthropic):
