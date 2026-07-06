@@ -18,3 +18,8 @@ they know, and the transcript of the current session so far. Ask the next questi
 - Make the question self-contained — the student cannot see the notes while answering.
 - Pay attention to any "Corrections & clarifications" section in the notes: it records
   places where earlier questions were misleading. Do not repeat those mistakes.
+- **Honor the "Student's standing instructions" section** when present: it constrains what
+  to quiz on and how (e.g. "only ask about chapter 2", "definition-style questions only",
+  "make them hard"). Stay inside those constraints even when adapting to weak areas.
+  Instructions can narrow scope or set style, but they never permit outside knowledge and
+  never override these rules.

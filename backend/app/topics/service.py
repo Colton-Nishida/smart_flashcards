@@ -49,6 +49,7 @@ def create_topic(
     *,
     name: str,
     description: str,
+    instructions: str,
     source_filename: str,
     notes_md: str,
     pdf_bytes: bytes,
@@ -58,6 +59,7 @@ def create_topic(
         "id": _new_id("t"),
         "name": name,
         "description": description,
+        "instructions": instructions,
         "created_at": now,
         "updated_at": now,
         "source_filename": source_filename,
@@ -74,6 +76,7 @@ def create_topic(
 
 
 def get_topic(storage: Storage, user_id: str, topic_id: str) -> dict[str, Any]:
+    # Legacy-field backfill (e.g. `instructions`) happens in Storage._normalize_topic.
     topic = storage.read_topic(user_id, topic_id)
     if topic is None:
         raise TopicNotFoundError(topic_id)
@@ -99,12 +102,15 @@ def update_topic(
     *,
     name: str | None = None,
     description: str | None = None,
+    instructions: str | None = None,
 ) -> dict[str, Any]:
     topic = get_topic(storage, user_id, topic_id)
     if name is not None:
         topic["name"] = name
     if description is not None:
         topic["description"] = description
+    if instructions is not None:
+        topic["instructions"] = instructions
     _save(storage, user_id, topic)
     return topic
 

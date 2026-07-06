@@ -84,11 +84,15 @@ def _transcript(session: dict[str, Any]) -> str:
 
 def _topic_context(topic: dict[str, Any]) -> str:
     memory = topic["mastery_notes"] or "(no history yet — this is a new topic for the student)"
-    return (
+    context = (
         f"# Topic: {topic['name']}\n\n"
         f"## Study notes\n\n{topic['notes_md']}\n\n"
         f"## Mastery memory (current score {topic['mastery_score']}/100)\n\n{memory}"
     )
+    # Storage backfills the field on read; .get() is belt-and-braces for hand-built dicts.
+    if instructions := topic.get("instructions"):
+        context += f"\n\n## Student's standing instructions\n\n{instructions}"
+    return context
 
 
 def extract_topic_notes(
@@ -97,25 +101,26 @@ def extract_topic_notes(
     pdf_bytes: bytes,
     topic_name: str,
     description: str,
+    instructions: str = "",
     model: str,
 ) -> TopicNotes:
     """Distill the uploaded PDF into the markdown notes doc the quiz runs off."""
     logger.info(
         "Extracting topic notes: model=%s pdf_bytes=%d topic=%r", model, len(pdf_bytes), topic_name
     )
+    text = (
+        f"Extract study notes for a topic named '{topic_name}'. "
+        f"User's description: {description or '(none)'}"
+    )
+    if instructions:
+        text += f"\nUser's additional instructions: {instructions}"
     return _parse(
         client,
         model=model,
         skill="topic_notes_extraction",
         content=[
             pdf_document_block(pdf_bytes),
-            {
-                "type": "text",
-                "text": (
-                    f"Extract study notes for a topic named '{topic_name}'. "
-                    f"User's description: {description or '(none)'}"
-                ),
-            },
+            {"type": "text", "text": text},
         ],
         output_format=TopicNotes,
         max_tokens=_EXTRACTION_MAX_TOKENS,

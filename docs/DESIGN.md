@@ -156,6 +156,10 @@ smart_flashcards/
   "description": "...",
   "created_at": "...", "updated_at": "...",
   "source_filename": "water_cycle.pdf",
+  "instructions": "...",          // standing guidance to the tutor (focus/question style).
+                                   // Used by extraction AT UPLOAD TIME and by every quiz
+                                   // call thereafter; editing later only affects quiz calls
+                                   // (the notes doc is not re-extracted).
   "notes_md": "# ...",            // Claude-extracted study notes; quiz source of truth.
                                    // Dispute corrections append to a "Corrections &
                                    // clarifications" section.
@@ -194,10 +198,10 @@ SQLite/Postgres only touches one layer.
 | `POST /api/decks/{id}/cards` | add a card |
 | `PATCH /api/decks/{id}/cards/{card_id}` | edit a card |
 | `DELETE /api/decks/{id}/cards/{card_id}` | delete a card |
-| `POST /api/topics` | multipart: `file` (PDF) + `name` + `description` → extracts notes doc, returns topic |
+| `POST /api/topics` | multipart: `file` (PDF) + `name` + `description` + `instructions` → extracts notes doc, returns topic |
 | `GET  /api/topics` | list topic summaries (mastery score, session count, active-session flag) |
 | `GET  /api/topics/{id}` | full topic: notes doc, mastery memory, sessions, active session |
-| `PATCH /api/topics/{id}` | rename / edit description |
+| `PATCH /api/topics/{id}` | rename / edit description / edit instructions |
 | `DELETE /api/topics/{id}` | delete topic (+ stored PDF) |
 | `GET  /api/topics/{id}/pdf` | download the original PDF |
 | `POST /api/topics/{id}/quiz/start` | `{num_questions (1-25), replace}` → first question; 409 if a session is active and `replace` is false |

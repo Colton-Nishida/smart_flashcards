@@ -121,8 +121,19 @@ class Storage:
     def _topic_pdf_path(self, user_id: str, topic_id: str) -> Path:
         return self._topic_dir(user_id) / f"{_check_id(topic_id)}.pdf"
 
+    @staticmethod
+    def _normalize_topic(topic: dict[str, Any]) -> dict[str, Any]:
+        """Backfill fields added after topics were first written to disk.
+
+        Lives at the storage seam so EVERY read path (and future DB migration)
+        gets the same compat rule exactly once.
+        """
+        topic.setdefault("instructions", "")
+        return topic
+
     def read_topic(self, user_id: str, topic_id: str) -> dict[str, Any] | None:
-        return _read_json(self._topic_path(user_id, topic_id))
+        topic = _read_json(self._topic_path(user_id, topic_id))
+        return None if topic is None else self._normalize_topic(topic)
 
     def write_topic(self, user_id: str, topic: dict[str, Any]) -> None:
         _atomic_write_json(self._topic_path(user_id, topic["id"]), topic)
@@ -135,7 +146,7 @@ class Storage:
         for path in sorted(topic_dir.glob("*.json")):
             topic = _read_json(path)
             if topic is not None:
-                topics.append(topic)
+                topics.append(self._normalize_topic(topic))
         return topics
 
     def delete_topic(self, user_id: str, topic_id: str) -> bool:

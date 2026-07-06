@@ -23,6 +23,7 @@ export default function NewTopicForm({ onCreated, onCancel }: NewTopicFormProps)
   const [file, setFile] = useState<File | null>(null)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [instructions, setInstructions] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [extracting, setExtracting] = useState(false)
 
@@ -43,7 +44,7 @@ export default function NewTopicForm({ onCreated, onCancel }: NewTopicFormProps)
     setError(null)
     setExtracting(true)
     try {
-      onCreated(await createTopic(file, name.trim(), description.trim()))
+      onCreated(await createTopic(file, name.trim(), description.trim(), instructions.trim()))
     } catch (err) {
       setError(errorMessage(err))
       setExtracting(false)
@@ -85,9 +86,24 @@ export default function NewTopicForm({ onCreated, onCancel }: NewTopicFormProps)
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
             maxLength={2000}
-            placeholder="What should the quiz focus on?"
+            placeholder="What is this topic about?"
             className="mt-1 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
           />
+        </label>
+        <label className="block text-sm font-medium text-stone-700">
+          Instructions for the tutor{' '}
+          <span className="font-normal text-stone-400">(optional)</span>
+          <textarea
+            value={instructions}
+            onChange={(e) => setInstructions(e.target.value)}
+            rows={3}
+            maxLength={4000}
+            placeholder="e.g. “Only cover section 3 of the PDF” · “Ask definition-style questions only” · “Make the questions hard”"
+            className="mt-1 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+          />
+          <span className="mt-1 block text-xs font-normal text-stone-400">
+            The tutor follows these when writing notes, picking questions, and scoring.
+          </span>
         </label>
       </fieldset>
 

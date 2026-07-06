@@ -48,6 +48,9 @@ class Topic(BaseModel):
     created_at: str
     updated_at: str
     source_filename: str
+    instructions: str = ""
+    """User's standing guidance to the tutor (focus areas, question style). Defaults
+    for topics stored before the field existed."""
     notes_md: str
     mastery_score: int
     mastery_notes: str
@@ -70,6 +73,7 @@ class TopicSummary(BaseModel):
 class TopicUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     description: str | None = Field(default=None, max_length=2000)
+    instructions: str | None = Field(default=None, max_length=4000)
 
 
 # ---- quiz request/response bodies ----

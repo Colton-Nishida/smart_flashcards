@@ -15,7 +15,9 @@ working rules.
   the session. No persisted study results in MVP.
 - Cards and decks are editable/deletable inline. One PDF = one deck; no appending.
 - **Topics tab** (dynamic quiz): two-column layout (wider `max-w-6xl` main). Left = topic list
-  with a red→green 0-100 mastery bar + inline new-topic PDF upload; right = tutor chat panel.
+  with a red→green 0-100 mastery bar + inline new-topic PDF upload (name, description, and
+  optional standing *instructions* for the tutor — focus areas / question style); right =
+  tutor chat panel.
   Chat flow: pick question count (1-25) → free-text answer → Good/Ok/Bad grade + feedback →
   Next / Dispute / Finish. Disputing can revise the grade and correct the notes doc. Finishing
   scores the session (mastery bar + memory update). A `Notes & progress` sub-tab shows the
