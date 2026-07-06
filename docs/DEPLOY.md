@@ -10,8 +10,9 @@ flat files, so the app needs **a persistent volume and exactly one replica**.
 |---|---|---|
 | `ANTHROPIC_API_KEY` | yes | Claude API key (set a spend limit in the Anthropic console) |
 | `SESSION_SECRET` | yes | Cookie-signing key. Generate: `python3 -c "import secrets; print(secrets.token_urlsafe(48))"` |
-| `INVITE_CODE` | strongly recommended | When set, registration requires this code — without it, anyone who finds the URL can create an account and spend your API credits |
+| `INVITE_CODE` | strongly recommended | When set, registration requires this code — without it, anyone who finds the URL can create an account and spend your API credits. Pick a long phrase (4+ random words): the endpoint is public, so a short code can be brute-forced. Failed attempts are logged |
 | `SESSION_COOKIE_SECURE` | `true` in production | Marks the session cookie HTTPS-only |
+| `PORT` | `8000` on Railway | Uvicorn binds this. Set it explicitly so the generated domain, healthcheck, and listener can never disagree |
 | `DATA_DIR` | baked into the image as `/data` | Must match the volume mount path |
 | `STATIC_DIR` | baked into the image as `/app/static` | Where the built frontend lives |
 | `ANTHROPIC_MODEL` | no | Defaults to `claude-sonnet-5` |
@@ -24,9 +25,10 @@ flat files, so the app needs **a persistent volume and exactly one replica**.
 2. **Add the volume** (before first real use): right-click the service → *Attach Volume*
    → mount path **`/data`**. Start with 1 GB; grow later if needed.
 3. **Set variables**: service → *Variables* → add `ANTHROPIC_API_KEY`, `SESSION_SECRET`
-   (fresh random value — NOT the dev one), `INVITE_CODE`, `SESSION_COOKIE_SECURE=true`.
-   Save → Railway redeploys.
-4. **Expose it**: service → *Settings* → *Networking* → *Generate Domain* (port 8000).
+   (fresh random value — NOT the dev one), `INVITE_CODE` (long phrase),
+   `SESSION_COOKIE_SECURE=true`, and `PORT=8000`. Save → Railway redeploys.
+4. **Expose it**: service → *Settings* → *Networking* → *Generate Domain*; when asked for
+   the port, use **8000** (it must match the `PORT` variable from step 3).
    You get `https://<something>.up.railway.app`.
 5. **Smoke test**: open `https://<domain>/api/health` → `{"status":"ok"}`, then the root
    URL → sign-up screen. Register with the invite code, upload a small PDF, confirm a deck
@@ -51,7 +53,7 @@ flat files, so the app needs **a persistent volume and exactly one replica**.
 ```bash
 docker build -t smart-flashcards .
 docker run --rm -p 8000:8000 \
-  -e ANTHROPIC_API_KEY=sk-... -e SESSION_SECRET=whatever -e INVITE_CODE=letmein \
+  -e ANTHROPIC_API_KEY=sk-... -e SESSION_SECRET=whatever -e INVITE_CODE="local test code" \
   -v sf-data:/data smart-flashcards
 # open http://localhost:8000
 ```

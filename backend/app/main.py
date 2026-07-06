@@ -4,6 +4,7 @@ import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 from app.auth.router import router as auth_router
 from app.config import Settings, get_settings
@@ -14,6 +15,10 @@ from app.storage import Storage
 from app.topics.router import router as topics_router
 
 logger = logging.getLogger(__name__)
+
+
+class Health(BaseModel):
+    status: str = "ok"
 
 
 def _configure_logging() -> None:
@@ -53,20 +58,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(topics_router)
     app.include_router(quiz_router)
 
-    @app.get("/api/health", tags=["ops"])
-    def health() -> dict[str, str]:
+    @app.get("/api/health", response_model=Health, tags=["ops"])
+    def health() -> Health:
         """Unauthenticated liveness probe for the hosting platform."""
-        return {"status": "ok"}
+        return Health()
 
     # Production: serve the built frontend from the same origin (docs/DEPLOY.md).
-    # Mounted last so every /api route above takes precedence.
+    # Mounted last so every /api route above takes precedence. A configured-but-missing
+    # dir is a broken deploy — fail startup so the platform healthcheck rejects it,
+    # rather than shipping an API-only app behind a green healthcheck.
     if settings.static_dir is not None:
-        if settings.static_dir.is_dir():
-            app.mount("/", SPAStaticFiles(directory=settings.static_dir, html=True), name="spa")
-        else:
-            logger.warning(
-                "STATIC_DIR %s does not exist — SPA serving disabled", settings.static_dir
-            )
+        if not settings.static_dir.is_dir():
+            raise RuntimeError(f"STATIC_DIR {settings.static_dir} is not a directory")
+        app.mount("/", SPAStaticFiles(directory=settings.static_dir, html=True), name="spa")
     return app
 
 
