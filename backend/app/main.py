@@ -8,7 +8,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.auth.router import router as auth_router
 from app.config import Settings, get_settings
 from app.decks.router import router as decks_router
+from app.spa import SPAStaticFiles
 from app.storage import Storage
+
+logger = logging.getLogger(__name__)
 
 
 def _configure_logging() -> None:
@@ -45,6 +48,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(auth_router)
     app.include_router(decks_router)
+
+    @app.get("/api/health", tags=["ops"])
+    def health() -> dict[str, str]:
+        """Unauthenticated liveness probe for the hosting platform."""
+        return {"status": "ok"}
+
+    # Production: serve the built frontend from the same origin (docs/DEPLOY.md).
+    # Mounted last so every /api route above takes precedence.
+    if settings.static_dir is not None:
+        if settings.static_dir.is_dir():
+            app.mount("/", SPAStaticFiles(directory=settings.static_dir, html=True), name="spa")
+        else:
+            logger.warning(
+                "STATIC_DIR %s does not exist — SPA serving disabled", settings.static_dir
+            )
     return app
 
 

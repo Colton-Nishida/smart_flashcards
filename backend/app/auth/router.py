@@ -19,7 +19,12 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 def register(
     credentials: Credentials,
     storage: Annotated[Storage, Depends(get_storage)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> UserPublic:
+    if settings.invite_code and credentials.invite_code != settings.invite_code:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, detail="Registration requires a valid invite code"
+        )
     try:
         user = service.register_user(storage, credentials.username, credentials.password)
     except service.UsernameTakenError:
@@ -43,6 +48,7 @@ def login(
         max_age=SESSION_MAX_AGE_SECONDS,
         httponly=True,
         samesite="lax",
+        secure=settings.session_cookie_secure,
         path="/",
     )
     return UserPublic(**{k: user[k] for k in ("id", "username", "created_at")})

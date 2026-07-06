@@ -19,6 +19,14 @@ class Settings(BaseSettings):
     anthropic_model: str = "claude-sonnet-5"
     session_secret: str = DEFAULT_SESSION_SECRET
     data_dir: Path = BACKEND_DIR.parent / "data"
+    # Production knobs (see docs/DEPLOY.md). All default to local-dev behavior.
+    invite_code: str = ""
+    """When set, /api/auth/register requires this exact code — keeps a public
+    deployment from letting strangers burn the Anthropic API key."""
+    session_cookie_secure: bool = False
+    """Set true behind HTTPS so the session cookie is never sent over plain HTTP."""
+    static_dir: Path | None = None
+    """When set (STATIC_DIR), serve the built frontend from here with an SPA fallback."""
 
     @field_validator("data_dir", mode="after")
     @classmethod
