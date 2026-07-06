@@ -20,16 +20,29 @@ logger = logging.getLogger(__name__)
 MAX_PDF_BYTES = 20 * 1024 * 1024  # practical cap, well under the 32 MB API limit
 _PDF_MAGIC = b"%PDF-"
 _SKILL_PATH = Path(__file__).resolve().parent.parent / "skills" / "flashcard_generation.md"
-# Output-token budget for one generation call. Kept under the SDK's non-streaming
-# timeout guard (which rejects very large max_tokens on a blocking request). The model
-# supports up to 128k, but going that high requires switching to a streaming call.
-_MAX_OUTPUT_TOKENS = 32000
+# Output-token budget for one generation call. The SDK's non-streaming guard rejects
+# any blocking request whose max_tokens implies >10 minutes at its assumed worst-case
+# speed (128k tokens/hour), i.e. anything over 21_333 raises ValueError at request
+# time. 21000 is the largest safe budget; going higher requires a streaming call.
+_MAX_OUTPUT_TOKENS = 21000
 
 
-def _is_truncated_json(exc: ValidationError) -> bool:
+def is_truncated_json(exc: ValidationError) -> bool:
     """True when the response body was incomplete JSON (output overflowed the token cap),
     as opposed to well-formed JSON that failed schema validation."""
     return any(err.get("type") == "json_invalid" for err in exc.errors())
+
+
+def pdf_document_block(pdf_bytes: bytes) -> dict:
+    """Native PDF content block (base64), shared by every PDF-reading Anthropic call."""
+    return {
+        "type": "document",
+        "source": {
+            "type": "base64",
+            "media_type": "application/pdf",
+            "data": base64.standard_b64encode(pdf_bytes).decode("ascii"),
+        },
+    }
 
 
 def validate_pdf(data: bytes) -> None:
@@ -54,7 +67,6 @@ def generate_flashcards(
     model: str,
 ) -> FlashcardDeck:
     """Send the PDF natively as a document block; parse guaranteed-valid card JSON."""
-    pdf_b64 = base64.standard_b64encode(pdf_bytes).decode("ascii")
     logger.info(
         "Generating flashcards: model=%s pdf_bytes=%d deck=%r", model, len(pdf_bytes), deck_name
     )
@@ -67,14 +79,7 @@ def generate_flashcards(
                 {
                     "role": "user",
                     "content": [
-                        {
-                            "type": "document",
-                            "source": {
-                                "type": "base64",
-                                "media_type": "application/pdf",
-                                "data": pdf_b64,
-                            },
-                        },
+                        pdf_document_block(pdf_bytes),
                         {
                             "type": "text",
                             "text": (
@@ -90,7 +95,7 @@ def generate_flashcards(
     except ValidationError as exc:
         # messages.parse() validates the response body and raises here BEFORE returning,
         # so we can't inspect stop_reason. Truncated JSON == output overflowed the token cap.
-        if _is_truncated_json(exc):
+        if is_truncated_json(exc):
             logger.warning(
                 "Generation output was truncated (hit the %d-token cap): "
                 "deck=%r pdf_bytes=%d — treating as document-too-large",

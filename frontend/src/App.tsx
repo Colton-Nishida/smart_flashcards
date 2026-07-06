@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Navigate, NavLink, Route, Routes } from 'react-router-dom'
+import { Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom'
 import { getMe, logout, UNAUTHORIZED_EVENT } from './api'
 import type { User } from './api'
 import Login from './pages/Login'
 import Upload from './pages/Upload'
 import Decks from './pages/Decks'
 import DeckView from './pages/DeckView'
+import Topics from './pages/Topics'
 
 export default function App() {
   // undefined = still checking the session, null = signed out.
@@ -55,6 +56,9 @@ interface ShellProps {
 
 function Shell({ user, onSignedOut }: ShellProps) {
   const [loggingOut, setLoggingOut] = useState(false)
+  const { pathname } = useLocation()
+  // The topics quiz is a two-column layout and needs more room than the reading-width pages.
+  const mainWidth = pathname.startsWith('/topics') ? 'max-w-6xl' : 'max-w-3xl'
 
   async function handleLogout() {
     setLoggingOut(true)
@@ -77,6 +81,7 @@ function Shell({ user, onSignedOut }: ShellProps) {
           <nav className="flex gap-1">
             <Tab to="/upload">Upload</Tab>
             <Tab to="/decks">Decks</Tab>
+            <Tab to="/topics">Topics</Tab>
           </nav>
           <div className="ml-auto flex items-center gap-3">
             <span className="hidden text-sm text-stone-500 sm:inline">{user.username}</span>
@@ -91,12 +96,13 @@ function Shell({ user, onSignedOut }: ShellProps) {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-4 py-8">
+      <main className={`mx-auto ${mainWidth} px-4 py-8`}>
         <Routes>
           <Route path="/" element={<Navigate to="/decks" replace />} />
           <Route path="/upload" element={<Upload />} />
           <Route path="/decks" element={<Decks />} />
           <Route path="/decks/:deckId" element={<DeckView />} />
+          <Route path="/topics" element={<Topics />} />
           <Route path="*" element={<Navigate to="/decks" replace />} />
         </Routes>
       </main>

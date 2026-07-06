@@ -148,6 +148,33 @@ smart_flashcards/
 }
 ```
 
+```jsonc
+// data/topics/<user_id>/<topic_id>.json   (+ sibling <topic_id>.pdf = original upload)
+{
+  "id": "t_...",
+  "name": "The Water Cycle",
+  "description": "...",
+  "created_at": "...", "updated_at": "...",
+  "source_filename": "water_cycle.pdf",
+  "notes_md": "# ...",            // Claude-extracted study notes; quiz source of truth.
+                                   // Dispute corrections append to a "Corrections &
+                                   // clarifications" section.
+  "mastery_score": 37,             // 0-100, agent-decided at each session end, can decrease
+  "mastery_notes": "...",          // the tutor's memory: what's known/untested, why the score
+  "sessions": [                    // compact archive; full transcripts are not persisted
+    { "id": "q_...", "started_at": "...", "completed_at": "...", "total_questions": 5,
+      "questions_answered": 5, "grades": {"good": 3, "ok": 1, "bad": 1},
+      "score_before": 30, "score_after": 37, "summary": "..." }
+  ],
+  "active_session": {              // null when idle; the quiz state machine
+    "id": "q_...", "started_at": "...", "total_questions": 5,
+    "status": "awaiting_answer",   // -> "awaiting_next" after grading, and back
+    "questions": [ { "question": "...", "answer": "...", "grade": "good",
+                     "feedback": "...", "disputes": [] } ]
+  }
+}
+```
+
 Writes go through a small `storage/` module (atomic write-then-rename) so a later swap to
 SQLite/Postgres only touches one layer.
 
@@ -167,6 +194,18 @@ SQLite/Postgres only touches one layer.
 | `POST /api/decks/{id}/cards` | add a card |
 | `PATCH /api/decks/{id}/cards/{card_id}` | edit a card |
 | `DELETE /api/decks/{id}/cards/{card_id}` | delete a card |
+| `POST /api/topics` | multipart: `file` (PDF) + `name` + `description` → extracts notes doc, returns topic |
+| `GET  /api/topics` | list topic summaries (mastery score, session count, active-session flag) |
+| `GET  /api/topics/{id}` | full topic: notes doc, mastery memory, sessions, active session |
+| `PATCH /api/topics/{id}` | rename / edit description |
+| `DELETE /api/topics/{id}` | delete topic (+ stored PDF) |
+| `GET  /api/topics/{id}/pdf` | download the original PDF |
+| `POST /api/topics/{id}/quiz/start` | `{num_questions (1-25), replace}` → first question; 409 if a session is active and `replace` is false |
+| `POST /api/topics/{id}/quiz/answer` | `{answer, session_id?, question_number?}` → Good/Ok/Bad grade + feedback |
+| `POST /api/topics/{id}/quiz/next` | next adaptive question |
+| `POST /api/topics/{id}/quiz/dispute` | `{message, ...binding}` → verdict (can raise the grade, may correct the notes doc) |
+| `POST /api/topics/{id}/quiz/finish` | score the session: updates mastery score + memory, archives the session |
+| `DELETE /api/topics/{id}/quiz` | abandon the active session without scoring |
 
 `POST /api/decks` is **synchronous** for the MVP (generation takes ~15–60s; the frontend shows
 a progress state). Upgrade path: FastAPI `BackgroundTasks` + a deck `status` field
@@ -264,3 +303,17 @@ filesystem MCPs (built-in).
 | Deck scope | One PDF = one deck, immutable source |
 | Anki export | Not wanted — in-app studying is the product |
 | MCP | Playwright MCP installed for browser-driven UI verification |
+
+## Decisions log — dynamic quiz (interview, 2026-07-05)
+
+| Decision | Choice |
+|---|---|
+| Topic content source | PDF upload → Claude extracts a markdown notes doc at creation; the quiz runs off the notes doc, corrections edit it, original PDF kept (downloadable) |
+| Question generation | One at a time, adaptive: each call sees the notes, the mastery memory, and the session so far |
+| Mastery score (0-100) | Agent-decided at session end, judged over the whole topic; **can decrease**; starts at 0 |
+| Persistence | Compact session summaries only — full chat transcripts are ephemeral (active session state survives reloads until finished/abandoned) |
+| Dispute flow | Agent rules on the objection: may raise the grade (never lower), may append a correction to the notes doc, always recorded for future sessions |
+| Visibility | Notes doc and the tutor's "why this score" memory are both user-visible (Notes & progress tab) |
+| Question count | Free number input, 1–25 |
+| Latency | Synchronous calls with a thinking indicator (matches deck generation); ~2-6s per turn |
+| Multi-tab safety | `start` requires `replace:true` over an active session; `answer`/`dispute` carry a session/question binding → 409 for stale tabs |
