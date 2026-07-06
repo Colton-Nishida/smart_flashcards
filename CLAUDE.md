@@ -25,6 +25,8 @@ Full spec, architecture, and phased plan: **`docs/DESIGN.md`** (read it before n
 | `backend/` | FastAPI app, Poetry project — see `backend/CLAUDE.md` |
 | `frontend/` | Vite + React + TS + Tailwind — see `frontend/CLAUDE.md` |
 | `docs/DESIGN.md` | The spec: architecture, API surface, data model, dev plan, decisions log |
+| `docs/DEPLOY.md` | Production deployment: Dockerfile shape, env vars, Railway walkthrough |
+| `Dockerfile` / `railway.json` | Single prod container (frontend build + FastAPI serving both). One replica only — storage is flat files |
 | `tasks/` | Task briefs from Cole |
 | `.claude/skills/` | Repo skills (learnings) |
 | `data/` | Runtime storage (users.json, decks) — gitignored, never commit its contents |
