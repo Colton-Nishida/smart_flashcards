@@ -1,5 +1,7 @@
 """Auth routes: /api/auth/*."""
 
+import logging
+import secrets
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
@@ -12,6 +14,8 @@ from app.config import Settings
 from app.deps import get_settings, get_storage
 from app.storage import Storage
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
@@ -19,7 +23,19 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 def register(
     credentials: Credentials,
     storage: Annotated[Storage, Depends(get_storage)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> UserPublic:
+    if settings.invite_code and not secrets.compare_digest(
+        credentials.invite_code.encode(), settings.invite_code.encode()
+    ):
+        # compare_digest resists timing attacks; the log line makes brute-force
+        # attempts against a public deployment visible.
+        logger.warning(
+            "Registration rejected: bad invite code for username=%r", credentials.username
+        )
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, detail="Registration requires a valid invite code"
+        )
     try:
         user = service.register_user(storage, credentials.username, credentials.password)
     except service.UsernameTakenError:
@@ -43,6 +59,7 @@ def login(
         max_age=SESSION_MAX_AGE_SECONDS,
         httponly=True,
         samesite="lax",
+        secure=settings.session_cookie_secure,
         path="/",
     )
     return UserPublic(**{k: user[k] for k in ("id", "username", "created_at")})

@@ -83,8 +83,16 @@ function json(method: string, body: unknown): RequestInit {
 
 // ---- Auth ----
 
-export function register(username: string, password: string): Promise<User> {
-  return request<User>('/auth/register', json('POST', { username, password }))
+/** inviteCode is only enforced when the server has INVITE_CODE configured. */
+export function register(
+  username: string,
+  password: string,
+  inviteCode = '',
+): Promise<User> {
+  return request<User>(
+    '/auth/register',
+    json('POST', { username, password, invite_code: inviteCode }),
+  )
 }
 
 export function login(username: string, password: string): Promise<User> {

@@ -7,15 +7,25 @@ from app.config import Settings
 from app.main import create_app
 
 
-@pytest.fixture
-def settings(tmp_path) -> Settings:
-    return Settings(
+def make_settings(tmp_path, **overrides) -> Settings:
+    """Test Settings with EVERY env-sensitive field pinned, so ambient environment
+    variables (e.g. an exported INVITE_CODE from a deploy rehearsal) can't leak in."""
+    defaults = dict(
         _env_file=None,
         anthropic_api_key="sk-test-key",
         anthropic_model="claude-sonnet-5",
         session_secret="test-session-secret",
         data_dir=tmp_path / "data",
+        invite_code="",
+        session_cookie_secure=False,
+        static_dir=None,
     )
+    return Settings(**{**defaults, **overrides})
+
+
+@pytest.fixture
+def settings(tmp_path) -> Settings:
+    return make_settings(tmp_path)
 
 
 @pytest.fixture

@@ -7,10 +7,11 @@ API surface and data model; root `CLAUDE.md` for working rules (worktrees, TDD, 
 
 | Path | Purpose |
 |---|---|
-| `app/main.py` | App factory `create_app(settings?)`, router mounting, CORS for the Vite dev server. Settings + Storage live on `app.state` |
-| `app/config.py` | `pydantic-settings` — `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `SESSION_SECRET` (warns if defaulted), `DATA_DIR` (resolved to absolute) |
+| `app/main.py` | App factory `create_app(settings?)`, router mounting, CORS for the Vite dev server, `GET /api/health`, and (when `STATIC_DIR` is set) SPA static serving. Settings + Storage live on `app.state` |
+| `app/config.py` | `pydantic-settings` — `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `SESSION_SECRET` (warns if defaulted), `DATA_DIR` (resolved to absolute), plus prod knobs `INVITE_CODE`, `SESSION_COOKIE_SECURE`, `STATIC_DIR` (docs/DEPLOY.md) |
+| `app/spa.py` | `SPAStaticFiles` — static files with index.html fallback for client-side routes; mounted at `/` after all API routers |
 | `app/deps.py` | Shared dependencies: `get_settings` / `get_storage` read from `request.app.state` |
-| `app/auth/` | register / login / logout / me — bcrypt hashes, itsdangerous-signed session cookie. `app/auth/deps.py` has the `current_user` dependency |
+| `app/auth/` | register / login / logout / me — bcrypt hashes, itsdangerous-signed session cookie. `app/auth/deps.py` has the `current_user` dependency. Register is gated by `INVITE_CODE` when configured (→ 403); the cookie gets `Secure` when `SESSION_COOKIE_SECURE=true` |
 | `app/decks/` | Deck + card CRUD routes + `POST /api/decks` (upload → generate → persist) |
 | `app/generation/` | PDF → flashcards via the `anthropic` SDK. `deps.py` has `get_anthropic_client` (override in tests); `http.py` has the shared `llm_errors` HTTP mapping; `service.py` exports `pdf_document_block` / `is_truncated_json` for other LLM callers |
 | `app/topics/` | Topic CRUD (`/api/topics`): PDF upload → extracted notes doc, 0-100 mastery score + memory, session history. `service.py` also holds the quiz-session state machine (`active_session` on the topic dict) |

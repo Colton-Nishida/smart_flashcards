@@ -13,6 +13,7 @@ export default function Login({ onLogin }: LoginProps) {
   const [mode, setMode] = useState<Mode>('login')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [inviteCode, setInviteCode] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -28,7 +29,7 @@ export default function Login({ onLogin }: LoginProps) {
     setError(null)
     try {
       if (mode === 'register') {
-        await register(username, password)
+        await register(username, password, inviteCode.trim())
       }
       // Register doesn't necessarily set the session cookie — log in either way.
       onLogin(await login(username, password))
@@ -81,6 +82,20 @@ export default function Login({ onLogin }: LoginProps) {
             className="mt-1 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-60"
           />
         </label>
+
+        {mode === 'register' && (
+          <label className="mt-4 block text-sm font-medium text-stone-700">
+            Invite code <span className="font-normal text-stone-400">(if you were given one)</span>
+            <input
+              type="text"
+              value={inviteCode}
+              onChange={(e) => setInviteCode(e.target.value)}
+              autoComplete="off"
+              disabled={busy}
+              className="mt-1 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-60"
+            />
+          </label>
+        )}
 
         {error && <p className="mt-4 text-sm text-red-700">{error}</p>}
 
